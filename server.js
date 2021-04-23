@@ -68,7 +68,6 @@ console.log('server started on port: ' + port)
 
 //// ROUTES /////
 
-// TODO - refactor HTTP verbs
 // TODO - add logging to all endpoints
 // TODO - refactor all DB updates to separate functions
 // TODO - add unit tests with supertest
@@ -131,7 +130,7 @@ app.get('/rooms/:roomCode/info', function(req, res) {
 /** 
  * Create a new room
  */
- app.post('/rooms/create', function (req, res) {
+ app.post('/rooms', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   if (req.body.user != null) {
@@ -237,8 +236,8 @@ app.post('/rooms/:roomCode/leave', function (req, res) {
 /**
  * Pull all messages for the room by room id (not room code!)
  */
-app.post('/rooms/:roomId/messages', function (req, res) {
-  res.header('Access-Control-Allow-Methods', 'POST')
+app.get('/rooms/:roomId/messages', function (req, res) {
+  res.header('Access-Control-Allow-Methods', 'GET')
   res.header('Content-Type', 'application/json')
   // get messages for a room by id
   Room.findById(req.params.roomId)
@@ -267,7 +266,7 @@ app.post('/rooms/:roomId/messages', function (req, res) {
  * Returns list of room messages.
  * Requires fields: user, message: { title, imageData, background } 
  */
-app.post('/rooms/:roomId/messages/send', function (req, res) {
+app.post('/rooms/:roomId/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   // create message, then add it to a room
@@ -312,7 +311,7 @@ app.post('/rooms/:roomId/messages/send', function (req, res) {
 /**
  * Delete a message by message id
  */
- app.delete('/messages/delete', function (req, res) {
+ app.delete('/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'DELETE')
   res.header('Content-Type', 'application/json')
   Message.findByIdAndDelete(req.body.message)
@@ -345,7 +344,7 @@ app.get('/users/:userId', function (req, res) {
  * Takes in an object containing name, email, and password fields
  */
 // TODO: check for duplicate user names and emails before allowing signup
-app.post('/account/register', function (req, res) {
+app.post('/users', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   // create new user
@@ -388,7 +387,7 @@ app.post('/account/register', function (req, res) {
  * Log user in and provide with auth token
  * Takes in object with email and password
  */
-app.post('/account/login', function (req, res) {
+app.post('/users/login', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   User.findOne({
@@ -430,7 +429,7 @@ app.post('/account/login', function (req, res) {
  */
 // TODO: add photo upload using mongoose + multer
 // update user account details (as many as are passed in)
-app.put('/account/update', function (req, res) {
+app.put('/users', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'PUT')
   res.header('Content-Type', 'application/json')
   // check new values for null, only include if not null
