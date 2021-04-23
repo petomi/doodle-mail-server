@@ -24,7 +24,6 @@ const app = express()
 
 // Express server
 const staticFileMiddleware = express.static(path.resolve(__dirname) + '/dist')
-console.log(path.resolve(__dirname) + '/dist')
 app.use(staticFileMiddleware)
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
@@ -54,17 +53,19 @@ app.use(cors({
 
 // connect to mongodb and ensure it works before starting server
 mongoose.set('useFindAndModify', false)
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhosts:27017/test', { useNewUrlParser: true, useUnifiedTopology: true })
-// if connection is successful, create DB and initialize server
-var db = mongoose.connection
-console.log('Database connection ready.')
-// bind connection on error event
-db.on('error', console.error.bind(console,  'MongoDB connection error:'))
+if (process.env.NODE_ENV !== 'test') {
+  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhosts:27017/test', { useNewUrlParser: true, useUnifiedTopology: true })
+  // if connection is successful, create DB and initialize server
+  var db = mongoose.connection
+  console.log('Database connection ready.')
+  // bind connection on error event
+  db.on('error', console.error.bind(console,  'MongoDB connection error:'))
 
-// start server
-var port = process.env.PORT || 5000
-app.listen(port)
-console.log('server started on port: ' + port)
+  // start server
+  var port = process.env.PORT || 5000
+  app.listen(port)
+  console.log('server started on port: ' + port)
+}
 
 //// ROUTES /////
 
