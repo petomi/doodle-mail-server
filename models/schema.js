@@ -47,8 +47,8 @@ const Room = mongoose.model('room', roomSchema)
 
 // export the models so node can see them
 module.exports = {
-  avatar: Avatar,
-  message: Message,
-  user: User,
-  room: Room
+  Avatar: Avatar,
+  Message: Message,
+  User: User,
+  Room: Room
 }

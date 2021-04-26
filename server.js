@@ -9,20 +9,14 @@ const cors = require('cors')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const nanoid = require('nanoid')
-const mongoose = require('mongoose')
-const ObjectId = mongoose.Types.ObjectId
+const dbhelper = require('./dbhelper')
 // const multer = require('multer')
 // const fs = require('fs')
-// import mongoose schema and assign model names // TODO - refactor to one liner
-const models = require('./models/schema.js')
-const User = models.user
-const Message = models.message
-const Room = models.room
-// const Avatar = models.avatar
 
+/**
+ * Configure Express Server
+ */
 const app = express()
-
-// Express server
 const staticFileMiddleware = express.static(path.resolve(__dirname) + '/dist')
 app.use(staticFileMiddleware)
 app.use(bodyParser.urlencoded({
@@ -31,7 +25,6 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json())
 
 // CORS setup
-
 var allowedOrigins = process.env.ALLOWED_ORIGINS.split(' ')
 // let allowedOrigins = '*'
 app.use(cors({
@@ -53,18 +46,10 @@ app.use(cors({
   exposedHeaders: ['origin', 'X-requested-with', 'Content-Type', 'Accept']
 }))
 
-// connect to mongodb and ensure it works before starting server
-mongoose.set('useFindAndModify', false)
+// keep tests from overwriting real data - TODO: use in memory DB in future to avoid this
 if (process.env.NODE_ENV !== 'test') {
-  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhosts:27017/test', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
-  // if connection is successful, create DB and initialize server
-  var db = mongoose.connection
-  console.log('Database connection ready.')
-  // bind connection on error event
-  db.on('error', console.error.bind(console, 'MongoDB connection error:'))
+  // connect to Mongo DB instance
+  dbhelper.createConnection()
 
   // start server
   var port = process.env.PORT || 5000
@@ -72,12 +57,13 @@ if (process.env.NODE_ENV !== 'test') {
   console.log('server started on port: ' + port)
 }
 
-//// ROUTES /////
+/**
+ * API Routes
+ */
 
 // TODO - add logging to all endpoints
-// TODO - refactor all DB updates to separate functions
-// TODO - add unit tests with supertest
-// TODO - create API endpoint documentation from comments (automated?)
+// TODO - add unit tests with supertest + jest
+// TODO - create Express API endpoint documentation from comments (automated?)
 // TODO - create automated test runs using CI before pushing to heroku
 // TODO - Create README with basic instructions and add CI tag to github repo readme
 // TODO - update client with all changes
@@ -94,7 +80,7 @@ app.get('/', function (req, res) {
 app.get('/rooms/info', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
   if (process.env.NODE_ENV !== 'production') {
-    Room.find({}).then((rooms) => {
+    dbhelper.getAllRoomInfo().then((rooms) => {
       res.status(200).send({
         rooms: rooms
       })
@@ -112,19 +98,7 @@ app.get('/rooms/:roomCode/info', function (req, res) {
   res.header('Content-Type', 'application/json')
   if (req.params.roomCode != null) {
     console.log(`Finding room: ${req.params.roomCode}`)
-    Room.findOne({
-      entryCode: req.params.roomCode
-    }).populate({
-      path: 'participants',
-      select: '-email -password'
-    }).populate({
-      path: 'messages',
-      select: '-room',
-      populate: {
-        path: 'author',
-        select: '-email-password'
-      }
-    }).then(function (room) {
+    dbhelper.getRoomInfo(req.params.roomCode).then(function (room) {
       res.status(200).send({
         room: room
       })
@@ -142,14 +116,10 @@ app.get('/rooms/:roomCode/info', function (req, res) {
 app.post('/rooms', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
-  if (req.body.user != null) {
+  if (req.body.userId != null) {
     // create a room with unique 4 char guid and add user to it
     const roomCode = nanoid.nanoid(4)
-    Room.create({
-      entryCode: roomCode,
-      participants: [req.body.user],
-      messages: []
-    }).then(function (room) {
+    dbhelper.createRoom(req.body.userId, roomCode).then(function (room) {
       res.status(200).send({
         room: room
       })
@@ -170,27 +140,9 @@ app.post('/rooms/:roomCode/join', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   // join an existing room using a code
-  if (req.params.roomCode != null && req.body.user != null) {
+  if (req.params.roomCode != null && req.body.userId != null) {
     // find room by roomCode, add user to it, and populate the array of users in room
-    Room.findOneAndUpdate({
-      entryCode: req.params.roomCode
-    }, {
-      $push: {
-        participants: new ObjectId(req.body.user)
-      }
-    }, {
-      new: true // get result after performing the update
-    }).populate({
-      path: 'participants',
-      select: '-email -password'
-    }).populate({
-      path: 'messages',
-      select: '-room',
-      populate: {
-        path: 'author',
-        select: '-email-password'
-      }
-    }).then((room) => {
+    dbhelper.joinRoom(req.body.userId, req.params.roomCode).then((room) => {
       // return data for room
       res.status(200).send({
         room: room
@@ -211,28 +163,9 @@ app.post('/rooms/:roomCode/leave', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   // join an existing room using a code
-  if (req.params.roomCode != null && req.body.user != null) {
+  if (req.params.roomCode != null && req.body.userId != null) {
     // find room by code and leave it
-    Room.findOneAndUpdate({
-      entryCode: req.params.roomCode
-    }, {
-      // remove user from room by id
-      $pull: {
-        participants: new ObjectId(req.body.user)
-      }
-    }, {
-      new: true // get result after performing the update.
-    }).then((room) => {
-      // if room is empty, delete room
-      if (room.participants.length === 0) {
-        Room.deleteOne({
-          _id: room._id
-        }, function (err) {
-          if (err) {
-            res.status(400).send(`Failed to remove room ${err.message}`)
-          }
-        })
-      }
+    dbhelper.leaveRoom(req.body.userId, req.params.roomCode).then(() => {
       res.sendStatus(200)
     }).catch((err) => {
       res.status(400).send(`Failed to remove user from room: ${err.message}`)
@@ -250,24 +183,15 @@ app.get('/rooms/:roomId/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
   res.header('Content-Type', 'application/json')
   // get messages for a room by id
-  Room.findById(req.params.roomId)
-    .populate({
-      path: 'messages',
-      select: '-room',
-      populate: {
-        path: 'author',
-        select: '-email -password'
-      }
-    })
-    .then((room) => {
-      if (room.participants.includes(req.body.user)) {
-        res.status(200).send(room.messages)
-      } else {
-        res.status(400).send(`You are not authorized to view this room's messages.`)
-      }
-    }).catch((err) => {
-      res.status(400).send(`Unable to retrieve room messages: ${err.message}`)
-    })
+  dbhelper.getRoomMessages(req.params.roomId).then((room) => {
+    if (room.participants.includes(req.body.userId)) {
+      res.status(200).send(room.messages)
+    } else {
+      res.status(400).send(`You are not authorized to view this room's messages.`)
+    }
+  }).catch((err) => {
+    res.status(400).send(`Unable to retrieve room messages: ${err.message}`)
+  })
 })
 
 /**
@@ -281,35 +205,11 @@ app.post('/rooms/:roomId/messages', function (req, res) {
   // create message, then add it to a room
   req.body.messages.forEach(function (message) {
     // insert each message into DB collection
-    Message.create({
-        author: new ObjectId(req.body.user),
-        room: new ObjectId(req.params.roomId),
-        title: message.title,
-        date: Date.now(),
-        imageData: message.imageData,
-        background: message.background
-      })
-      .then((message) => {
-        Room.findByIdAndUpdate(req.params.roomId, {
-          $push: {
-            messages: new ObjectId(message._id)
-          }
-        }, {
-          new: true
-        }).populate({
-          path: 'messages',
-          select: '-room',
-          populate: {
-            path: 'author',
-            select: '-email -password'
-          }
-        }).then((room) => {
-          res.status(200).send(room.messages)
-        }).catch((err) => {
-          res.status(400).send(`Failed to send message to room: ${err.message}`)
-        })
+    dbhelper.sendMessageToRoom(message, req.body.userId, req.params.roomId)
+      .then((room) => {
+        res.status(200).send(room.messages)
       }).catch((err) => {
-        res.status(400).send(`Failed to create message: ${err.message}`)
+        res.status(400).send(`Failed to send message to room: ${err.message}`)
       })
   })
 })
@@ -320,7 +220,7 @@ app.post('/rooms/:roomId/messages', function (req, res) {
 app.delete('/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'DELETE')
   res.header('Content-Type', 'application/json')
-  Message.findByIdAndDelete(req.body.message)
+  dbhelper.deleteMessageById(req.body.messageId)
     .then(() => {
       res.sendStatus(200)
     }).catch((err) => {
@@ -334,10 +234,7 @@ app.delete('/messages', function (req, res) {
 app.get('/users/:userId', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
   res.header('Content-Type', 'application/json')
-  User.findById(req.params.userId, {
-      name: 1,
-      email: 1
-    })
+  dbhelper.getUserProfileById(req.params.userId)
     .then((doc) => {
       return res.status(200).json({
         user: doc
@@ -357,40 +254,26 @@ app.post('/users', function (req, res) {
   res.header('Content-Type', 'application/json')
   // create new user
   bcrypt.hash(req.body.password, 8).then((hashedPassword) => {
-    User.create({
-      name: req.body.name,
-      email: req.body.email,
-      password: hashedPassword,
-      // avatar: req.body.avatar,
-    }).then(() => {
-      // log in user with token
-      User.findOne({
-          email: req.body.email
+    dbhelper.createUserProfile(req.body.name, req.body.email, hashedPassword)
+      .then((user) => {
+        let token = jwt.sign({
+          id: user._id
+        }, process.env.TOKEN_SECRET, {
+          expiresIn: 86400 // expires in 24 hours
         })
-        .then((user) => {
-          let token = jwt.sign({
-            id: user._id
-          }, process.env.TOKEN_SECRET, {
-            expiresIn: 86400 // expires in 24 hours
-          })
-          res.status(200).send({
-            auth: true,
-            token: token,
-            user: user
-          })
-        }).catch((err) => {
-          console.log(err)
-          return res.status(400).send(`There was a problem logging in user.`)
+        res.status(200).send({
+          auth: true,
+          token: token,
+          user: user
         })
-    }).catch((err) => {
-      console.log(err)
-      return res.status(400).send(`There was a problem registering the user: ${err}`)
-    })
+      }).catch((err) => {
+        console.log(err)
+        return res.status(400).send(`There was a problem logging in user.`)
+      })
   }).catch((err) => {
     console.log(err)
-    return res.status(500).send('Server error.')
+    return res.status(400).send(`There was a problem registering the user: ${err}`)
   })
-
 })
 
 /**
@@ -400,9 +283,7 @@ app.post('/users', function (req, res) {
 app.post('/users/login', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
-  User.findOne({
-    email: req.body.email
-  }).then((doc) => {
+  dbhelper.getUserProfileByEmail(req.body.email).then((doc) => {
     if (!doc) {
       return res.status(404).send('No user found.')
     }
@@ -453,12 +334,7 @@ app.put('/users', function (req, res) {
       .then((hashedPassword) => {
         updated.password = hashedPassword
         // get user belonging to that context GUID and update their properties
-        // TODO - can refactor to be a function taking in "updated" object
-        User.findByIdAndUpdate(
-          req.body.id, {
-            $set: updated
-          }
-        ).then(() => {
+        dbhelper.updateUserProfile(req.body.userId, updated).then(() => {
           res.sendStatus(200)
         }).catch((err) => {
           res.status(400).send(`Failed to update account: ${err.message}`)
@@ -469,12 +345,7 @@ app.put('/users', function (req, res) {
 
   } else {
     // get user belonging to that context GUID and update their properties
-    // TODO - can refactor to be a function taking in "updated" object
-    User.findByIdAndUpdate(
-      req.body.id, {
-        $set: updated
-      }
-    ).then(() => {
+    dbhelper.updateUserProfile(req.body.id, updated).then(() => {
       res.sendStatus(200)
     }).catch((err) => {
       res.status(400).send(`Failed to update account: ${err.message}`)
