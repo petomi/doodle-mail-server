@@ -240,9 +240,11 @@ const createUserProfile = (name, email, hashedPassword) => {
         resolve(user)
       }).catch((err) => {
         console.log(`Error finding new user: ${err}`)
+        reject()
       })
     }).catch((err) => {
       console.log(`Error creating user profile: ${err}`)
+      reject()
     })
   })
 }
