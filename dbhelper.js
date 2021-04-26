@@ -19,6 +19,7 @@ const createConnection = () => {
   // if connection is successful, create DB and initialize server
   var db = mongoose.connection
   console.log('Database connection ready.')
+  console.log(process.env.MONGO_URL) // TODO: remove this, just for debug!
   // bind connection on error event
   db.on('error', console.error.bind(console, 'MongoDB connection error:'))
 }
@@ -271,6 +272,72 @@ const updateUserProfile = (userId, updatedProperties) => {
   )
 }
 
+/**
+ * Seeds the database with test data.
+ * @todo TODO: Move this to a separate module?
+ * @returns {Promise}
+ */
+const seedTestData = () => {
+  return new Promise(function (resolve, reject) {
+    User.create([{
+        name: 'Jim Test',
+        email: 'test@test.com',
+        password: '$2b$08$KLu9La4ucbj.aKDBnS/9d.TnsrrEp.yyQHcuJZFkNrCFt0MQEAgK2'
+      },
+      {
+        name: 'Bob Test',
+        email: 'test2@test.com',
+        password: '$2b$08$ZCNcsq1agfLQvV3Von21nu9po452CsgFDD1ccQLBBTGhIAziQXVJO'
+      }
+    ]).then((users) => {
+      Room.create({
+        entryCode: 'ABCD',
+        participants: [
+          new ObjectId(users[0]._id),
+          new ObjectId(users[1]._id)
+        ],
+        messages: []
+      }).then((room) => {
+        Message.create([{
+            author: new ObjectId(users[0]._id),
+            room: new ObjectId(room._id),
+            title: 'Test Message 1',
+            date: Date.now(),
+            imageData: 'testimagedata',
+            background: 'white'
+          },
+          {
+            author: new ObjectId(users[1]._id),
+            room: new ObjectId(room._id),
+            title: 'Test Message 2',
+            date: Date.now(),
+            imageData: 'testimagedata',
+            background: 'white'
+          }
+        ]).then((messages) => {
+          messages.forEach((message) => {
+            Room.findByIdAndUpdate(room._id, {
+              $push: {
+                messages: new ObjectId(message._id)
+              }
+            }).then(() => {
+              resolve()
+            }).catch(() => {
+              reject()
+            })
+          })
+        }).catch(() => {
+          reject()
+        })
+      }).catch(() => {
+        reject()
+      })
+    }).catch(() => {
+      reject()
+    })
+  })
+}
+
 module.exports = {
   createConnection,
   getAllRoomInfo,
@@ -284,5 +351,6 @@ module.exports = {
   getUserProfileById,
   getUserProfileByEmail,
   createUserProfile,
-  updateUserProfile
+  updateUserProfile,
+  seedTestData
 }

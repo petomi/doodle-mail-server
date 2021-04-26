@@ -18,7 +18,8 @@
         {
             "files": [
                 "**/*.spec.js",
-                "**/*.spec.jsx"
+                "**/*.spec.jsx",
+                "**/jest.setup.js"
             ],
             "env": {
                 "jest": true
