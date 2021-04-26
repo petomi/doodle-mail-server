@@ -20,12 +20,14 @@ afterAll(async () => {
 })
 
 /**
- * Clear db between each test
+ * Clear db and re-seed data between each test
  */
 beforeEach(async() => {
   await testdb.clear()
   await testdb.seed()
 })
+
+// TODO - write unit tests!
 
 describe('Sample Test', () => {
   it('should test that number of users = 2', async () => {
