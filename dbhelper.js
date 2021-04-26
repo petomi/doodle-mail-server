@@ -10,9 +10,9 @@ const ObjectId = mongoose.Types.ObjectId
 /**
  * Creates a Mongo DB connection instance.
  */
-const createConnection = () => {
+const createConnection = (mongoHost) => {
   mongoose.set('useFindAndModify', false)
-  mongoose.connect(process.env.MONGO_URL || 'mongodb://localhosts:27017/test', {
+  mongoose.connect(mongoHost || 'mongodb://localhosts:27017/test', {
     useNewUrlParser: true,
     useUnifiedTopology: true
   })
@@ -22,6 +22,13 @@ const createConnection = () => {
   console.log(process.env.MONGO_URL) // TODO: remove this, just for debug!
   // bind connection on error event
   db.on('error', console.error.bind(console, 'MongoDB connection error:'))
+}
+
+/**
+ * Closes the Mongo DB connection.
+ */
+const closeConnection = () => {
+  mongoose.disconnect()
 }
 
 /**
@@ -340,6 +347,7 @@ const seedTestData = () => {
 
 module.exports = {
   createConnection,
+  closeConnection,
   getAllRoomInfo,
   getRoomInfo,
   createRoom,

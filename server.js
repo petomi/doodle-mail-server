@@ -49,7 +49,7 @@ app.use(cors({
 // keep tests from overwriting real data - TODO: use in memory DB in future to avoid this
 if (process.env.NODE_ENV !== 'test') {
   // connect to Mongo DB instance
-  dbhelper.createConnection()
+  dbhelper.createConnection(process.env.MONGO_URL)
 
   // start server
   var port = process.env.PORT || 5000
