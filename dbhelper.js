@@ -33,8 +33,8 @@ const getAllRoomInfo = () => {
 
 /**
  * Get info for a specific chat room by alpha code.
- * @param {string} roomCode
- * @returns {Promise<Object>}
+ * @param {string} roomCode The 4 digit code used to join the room.
+ * @returns {Promise<Object>} Promise object represents the room info.
  */
 const getRoomInfo = (roomCode) => {
   return Room.findOne({
@@ -54,9 +54,9 @@ const getRoomInfo = (roomCode) => {
 
 /**
  * Create a new chat room.
- * @param {string} userId
- * @param {string} roomCode
- * @returns {Promise<Object>}
+ * @param {string} userId The id of the user creating the room.
+ * @param {string} roomCode The 4 digit code used to join the room.
+ * @returns {Promise<Object>} Promise object represents the created room info.
  */
 const createRoom = (userId, roomCode) => {
   return Room.create({
@@ -68,9 +68,9 @@ const createRoom = (userId, roomCode) => {
 
 /**
  * Join a chat room by room code.
- * @param {string} userId
- * @param {string} roomCode
- * @returns {Promise<Object>}
+ * @param {string} userId The id of the user joining the room.
+ * @param {string} roomCode The 4 digit room code of the room being joined.
+ * @returns {Promise<Object>} Promise object represents the room after joining.
  * @todo TODO: check whether user is already part of room before adding them
  */
 const joinRoom = (userId, roomCode) => {
@@ -97,9 +97,9 @@ const joinRoom = (userId, roomCode) => {
 
 /**
  * Leave chat room by room code.
- * @param {string} userId
- * @param {string} roomCode
- * @returns {Promise<Object>}
+ * @param {string} userId The id of the user that is leaving the room.
+ * @param {string} roomCode The 4 digit room code of the room being left.
+ * @returns {Promise}
  */
 const leaveRoom = (userId, roomCode) => {
   return new Promise(function (resolve, reject) {
@@ -129,8 +129,8 @@ const leaveRoom = (userId, roomCode) => {
 
 /**
  * Get room messages by room id.
- * @param {string} roomId
- * @returns {Promise<Array<Object>>}
+ * @param {string} roomId The id of the room to get messages for.
+ * @returns {Promise<Array<Object>>} Promise object represents an array of messages from the room.
  */
 const getRoomMessages = (roomId) => {
   return Room.findById(roomId)
@@ -146,10 +146,13 @@ const getRoomMessages = (roomId) => {
 
 /**
  * Send a message to a chat room.
- * @param {{title: string, imageData: string, background: string}} message
- * @param {string} userId
- * @param {string} roomId
- * @returns {Promise<Object>}
+ * @param {Object} message The message object being sent to the chat room.
+ * @param {string} message.title The title of the message.
+ * @param {string} message.imageData The image data, saved to a base64 string.
+ * @param {string} message.background The background color of the image, as hex code or name.
+ * @param {string} userId The id of the user sending the message.
+ * @param {string} roomId The id of the room to send the message to.
+ * @returns {Promise<Object>} Promise object represents the room state after message is sent.
  */
 const sendMessageToRoom = (message, userId, roomId) => {
   return new Promise(function (resolve, reject) {
@@ -187,7 +190,7 @@ const sendMessageToRoom = (message, userId, roomId) => {
 
 /**
  * Delete a message by message id.
- * @param {string} messageId
+ * @param {string} messageId The id of the message to delete.
  * @returns {Promise}
  */
 const deleteMessageById = (messageId) => {
@@ -196,8 +199,8 @@ const deleteMessageById = (messageId) => {
 
 /**
  * Get a user profile by profile id.
- * @param {string} userId
- * @returns {Promise<Object>}
+ * @param {string} userId The id of the user being fetched.
+ * @returns {Promise<Object>} Promise object represents the fetched user profile.
  */
 const getUserProfileById = (userId) => {
   return User.findById(userId, {
@@ -208,8 +211,8 @@ const getUserProfileById = (userId) => {
 
 /**
  * Get a user profile by email.
- * @param {string} email
- * @returns {Promise<Object>}
+ * @param {string} email The email of the user being fetched.
+ * @returns {Promise<Object>} Promise object represents the fetched user profile.
  */
 const getUserProfileByEmail = (email) => {
   return User.findOne({
@@ -219,10 +222,10 @@ const getUserProfileByEmail = (email) => {
 
 /**
  * Create a user profile.
- * @param {string} name
- * @param {string} email
- * @param {string} hashedPassword
- * @returns {Promise<Object>}
+ * @param {string} name The name of the user being created.
+ * @param {string} email The email of the user being created.
+ * @param {string} hashedPassword The password of the user being created, hashed and salted.
+ * @returns {Promise<Object>} Promise object represents the created user profile.
  * @todo TODO: check for duplicate user names and emails before allowing signup
  */
 const createUserProfile = (name, email, hashedPassword) => {
@@ -251,9 +254,12 @@ const createUserProfile = (name, email, hashedPassword) => {
 
 /**
  * Update a user profile by user id.
- * @param {string} userId
- * @param {{name: string?, email: string?, password: string?}} updatedProperties
- * @returns {Promise<Object>}
+ * @param {string} userId The id of the user being updated.
+ * @param {Object} updatedProperties An object containing the udpates to make for the user profile.
+ * @param {string?} updatedProperties.name The new name of the user.
+ * @param {string} updatedProperties.email The new email for the user.
+ * @param {string} updatedProperties.password The new password for the user (hashed and salted).
+ * @returns {Promise<Object>} Promise object represents the updated user profile.
  */
 const updateUserProfile = (userId, updatedProperties) => {
   return User.findByIdAndUpdate(
