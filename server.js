@@ -10,6 +10,7 @@ const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const nanoid = require('nanoid')
 const dbhelper = require('./dbhelper')
+const { resolve } = require('path')
 // const multer = require('multer')
 // const fs = require('fs')
 
@@ -202,15 +203,26 @@ app.get('/rooms/:roomId/messages', function (req, res) {
 app.post('/rooms/:roomId/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
+  let result = null
   // create message, then add it to a room
-  req.body.messages.forEach(function (message) {
-    // insert each message into DB collection
-    dbhelper.sendMessageToRoom(message, req.body.userId, req.params.roomId)
+  let messageWrites = req.body.messages.map((message) =>  {
+    return new Promise((resolve, reject) => {
+      // insert each message into DB collection
+      dbhelper.sendMessageToRoom(message, req.body.userId, req.params.roomId)
       .then((room) => {
-        res.status(200).send(room.messages)
-      }).catch((err) => {
-        res.status(400).send(`Failed to send message to room: ${err.message}`)
+        result = room
+        resolve()
       })
+      .catch((err) => {
+        console.log(`Error writing message to room: ${err.message}`)
+        reject()
+      })
+    })
+  })
+  Promise.all(messageWrites).then(() => {
+    res.status(200).send(result.messages)
+  }).catch((err) => {
+    res.status(400).send(`Failed to send message to room: ${err.message}`)
   })
 })
 

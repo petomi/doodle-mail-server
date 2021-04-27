@@ -106,7 +106,7 @@ describe('POST /rooms/:roomCode/join', () => {
 })
 
 describe('POST /rooms/:roomCode/leave', () => {
-  it('It should remove the user from the room.', async(done) => {
+  it('It should remove the user from the room.', async (done) => {
     const users = await User.find({})
     agent
       .post('/rooms/ABCD/leave')
@@ -118,7 +118,7 @@ describe('POST /rooms/:roomCode/leave', () => {
         done()
       })
   })
-  test('Removing all users deletes the room.', async(done) => {
+  it('Removes the room if all users have left.', async (done) => {
     const users = await User.find({})
     agent
       .post('/rooms/ABCD/leave')
@@ -136,8 +136,8 @@ describe('POST /rooms/:roomCode/leave', () => {
           .then(async () => {
             // check to see if room is gone now that users have left
             await Room.findOne({
-              entryCode: 'ABCD'
-            })
+                entryCode: 'ABCD'
+              })
               .then((room) => {
                 expect(room).toBe(null)
                 done()
@@ -147,8 +147,67 @@ describe('POST /rooms/:roomCode/leave', () => {
   })
 })
 
-describe('POST /rooms/:roomId/messages', () => {
+describe('GET /rooms/:roomId/messages', () => {
+  it('Gets all messages for the selected room.', async (done) => {
+    const room = await Room.findOne({})
+    agent
+      .get(`/rooms/${room._id}/messages`)
+      .send({
+        userId: room.participants[0]._id
+      })
+      .expect(200)
+      .then(res => {
+        expect(res.body.length).toBe(2)
+        done()
+      })
+  })
+})
 
+describe('POST /rooms/:roomId/messages', () => {
+  it('Adds a message to the indicated room.', async (done) => {
+    const user = await User.findOne({})
+    const room = await Room.findOne({})
+    agent
+      .post(`/rooms/${room._id}/messages`)
+      .send({
+        messages: [{
+          title: 'Test Message 5',
+          imageData: 'TALKJLASJD',
+          background: 'blue'
+        }],
+        userId: user._id
+      })
+      .expect(200)
+      .then(res => {
+        expect(res.body.length).toBe(3)
+        done()
+      })
+  })
+  it('Adds multiple messages to the indicated room.', async (done) => {
+    const user = await User.findOne({})
+    const room = await Room.findOne({})
+    agent
+      .post(`/rooms/${room._id}/messages`)
+      .send({
+        messages: [{
+            title: 'Test Message 5',
+            imageData: 'TALKJLASJD',
+            background: 'blue'
+          },
+          {
+            "title": 'Test Message 6',
+            "imageData": 'TALKJLASJD',
+            "background": 'white'
+          }
+        ],
+        userId: user._id
+      })
+      .expect(200)
+      .then(res => {
+        expect(res.body.length).toBe(4)
+        done()
+      })
+  })
 })
 
 describe('DELETE /messages', () => {
