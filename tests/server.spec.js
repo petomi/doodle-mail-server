@@ -135,7 +135,7 @@ describe('POST /rooms/:roomCode/leave', () => {
           .expect(200)
           .then(async () => {
             // check to see if room is gone now that users have left
-            await Room.find({
+            await Room.findOne({
               entryCode: 'ABCD'
             })
               .then((room) => {

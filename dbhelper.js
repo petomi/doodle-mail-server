@@ -125,9 +125,12 @@ const leaveRoom = (userId, roomCode) => {
       if (room.participants.length === 0) {
         Room.deleteOne({
           _id: room._id
+        }).then(() => {
+          resolve()
         })
+      } else {
+        resolve()
       }
-      resolve()
     }).catch((err) => {
       console.log(`Error leaving room: ${err}`)
       reject()
