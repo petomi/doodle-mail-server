@@ -340,25 +340,33 @@ app.put('/users', function (req, res) {
   if (req.body.updatedProperties.email) updated.email = req.body.updatedProperties.email
 
   // if password is being updated, hash with bcrypt before doing update operation
-  if (req.body.updatedProperties.password) {
+  console.log(req.body)
+  if (req.body.updatedProperties.password != undefined) {
+    console.log('hashing password')
     bcrypt.hash(req.body.updatedProperties.password, 8)
       .then((hashedPassword) => {
         updated.password = hashedPassword
         // get user belonging to that context GUID and update their properties
-        dbhelper.updateUserProfile(req.body.userId, updated).then(() => {
-          res.sendStatus(200)
+        dbhelper.updateUserProfile(req.body.userId, updated)
+        .then((user) => {
+          res.status(200).send({
+            user: user
+          })
         }).catch((err) => {
           res.status(400).send(`Failed to update account: ${err.message}`)
         })
       }).catch((err) => {
         res.status(400).send(`Failed to update account: ${err.message}`)
       })
-
   } else {
     // get user belonging to that context GUID and update their properties
-    dbhelper.updateUserProfile(req.body.id, updated).then(() => {
-      res.sendStatus(200)
+    dbhelper.updateUserProfile(req.body.id, updated)
+    .then((user) => {
+      res.status(200).send({
+        user: user
+      })
     }).catch((err) => {
+      console.log(err)
       res.status(400).send(`Failed to update account: ${err.message}`)
     })
   }

@@ -48,7 +48,7 @@ const clear = async () => {
 };
 
 const seed = () => {
-  return new Promise(function (resolve, reject) {
+  return new Promise(function (resolve) {
     User.create([{
         name: 'Jim Test',
         email: 'test@test.com',

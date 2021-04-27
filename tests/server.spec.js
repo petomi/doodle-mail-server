@@ -1,9 +1,11 @@
 const request = require('supertest')
+const bcrypt = require('bcrypt')
 const testdb = require('./test-db')
 const app = require('../server')
 const {
   User,
-  Room
+  Room,
+  Message
 } = require('../models/schema')
 
 const agent = request.agent(app)
@@ -211,21 +213,103 @@ describe('POST /rooms/:roomId/messages', () => {
 })
 
 describe('DELETE /messages', () => {
-
+  it('Deletes the desired message', async (done) => {
+    const message = await Message.findOne({})
+    agent
+      .delete('/messages')
+      .send({
+        messageId: message._id
+      })
+      .expect(200)
+      .then(() => {
+        done()
+      })
+  })
 })
 
 describe('GET /users/:userId', () => {
-
+  it('Gets a user by profile id.', async (done) => {
+    const user = await User.findOne({})
+    agent
+      .get(`/users/${user._id}`)
+      .expect(200)
+      .then(res => {
+        expect(res.body.user._id.toString()).toBe(user._id.toString())
+        done()
+      })
+  })
 })
 
 describe('POST /users', () => {
-
+  it('Adds a new user profile.', done => {
+    const newUser = {
+      name: 'Test Test',
+      email: 'test100@test.com',
+      password: 'abcd'
+    }
+    agent
+      .post('/users')
+      .send(newUser)
+      .expect(200)
+      .then(res => {
+        expect(res.body.user.name).toBe(newUser.name)
+        expect(res.body.user.email).toBe(newUser.email)
+        expect(bcrypt.compareSync(res.body.user.password, newUser.password))
+        done()
+      })
+  })
 })
 
 describe('POST /users/login', () => {
-
+  it('Logs in the user.', done => {
+    agent
+      .post('/users/login')
+      .send({
+        email: 'test@test.com',
+        password: 'abcd'
+      })
+      .expect(200)
+      .then(res => {
+        expect(res.body.user.email).toBe('test@test.com')
+        expect(res.body.token).not.toBe(null)
+        done()
+      })
+  })
 })
 
-describe('PUT /users', () => {
-
+describe('PUT /users', async () => {
+  it('Updates the user profile (no password)', async (done) => {
+    const user = await User.findOne({})
+    agent
+      .post('/users')
+      .send({
+        userId: user._id,
+        updatedProperties: {
+          name: 'new name',
+          email: 'test88@test.com'
+        }
+      })
+      .expect(200)
+      .then(res => {
+        expect(res.body.user.name).toBe('new name')
+        expect(res.body.user.email).toBe('test88@test.com')
+        done()
+      })
+  })
+  it('Updates the user profile (with password)', async (done) => {
+    const user = await User.findOne({})
+    agent
+      .put('/users')
+      .send({
+        userId: user._id,
+        updatedProperties: {
+          password: 'cdef'
+        }
+      })
+      .expect(200)
+      .then(res => {
+        expect(bcrypt.compareSync(res.body.user.password, 'cdef'))
+        done()
+      })
+  })
 })
