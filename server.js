@@ -46,7 +46,7 @@ app.use(cors({
   exposedHeaders: ['origin', 'X-requested-with', 'Content-Type', 'Accept']
 }))
 
-// keep tests from overwriting real data
+// only connect to mongo and start web server if not a test
 if (process.env.NODE_ENV !== 'test') {
   // connect to Mongo DB instance
   dbhelper.createConnection(process.env.MONGO_URL)

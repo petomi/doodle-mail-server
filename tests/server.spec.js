@@ -427,7 +427,7 @@ describe('POST /users/login', () => {
   })
 })
 
-describe('PUT /users', async () => {
+describe('PUT /users', () => {
   // use describe to make the tests synchronous (avoid bcrypt issue)
   it('Updates the user profile (no password)', async (done) => {
     const user = await User.findOne({})
