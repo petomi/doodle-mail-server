@@ -32,8 +32,6 @@ beforeEach(async () => {
   await testdb.seed()
 })
 
-// TODO - write unit tests to handle errors gracefully!
-
 describe('GET /', () => {
   it('It should return a welcome message.', done => {
     agent
@@ -195,7 +193,7 @@ describe('GET /rooms/:roomId/messages', () => {
     agent
       .get(`/rooms/${room._id}/messages`)
       .send({})
-      .expect(400)
+      .expect(401)
       .then(() => {
         done()
       })
