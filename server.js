@@ -71,7 +71,7 @@ if (process.env.NODE_ENV !== 'test') {
 // home/test page
 app.get('/', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
-  res.status(200).send('Welcome to doodle-mail!')
+  return res.status(200).send('Welcome to doodle-mail!')
 })
 
 /**
@@ -81,12 +81,12 @@ app.get('/rooms/info', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
   if (process.env.NODE_ENV !== 'production') {
     dbhelper.getAllRoomInfo().then((rooms) => {
-      res.status(200).send({
+      return res.status(200).send({
         rooms: rooms
       })
     })
   } else {
-    res.status(200).send('Nice try :)')
+    return res.status(200).send('Nice try :)')
   }
 })
 
@@ -99,14 +99,16 @@ app.get('/rooms/:roomCode/info', function (req, res) {
   if (req.params.roomCode != null) {
     console.log(`Finding room: ${req.params.roomCode}`)
     dbhelper.getRoomInfo(req.params.roomCode).then(function (room) {
-      res.status(200).send({
+      return res.status(200).send({
         room: room
       })
     }).catch((err) => {
-      res.status(400).send(`Failed to get room info: ${err.message}`)
+      return res.status(400).send({
+        message: `Failed to get room info: ${err.message}`
+      })
     })
   } else {
-    res.status(400).send()
+    return res.status(400).send()
   }
 })
 
@@ -120,15 +122,17 @@ app.post('/rooms', function (req, res) {
     // create a room with unique 4 char guid and add user to it
     const roomCode = nanoid.nanoid(4)
     dbhelper.createRoom(req.body.userId, roomCode).then(function (room) {
-      res.status(200).send({
+      return res.status(200).send({
         room: room
       })
     }).catch((err) => {
-      res.status(400).send(`Failed to create new room: ${err.message}`)
+      return res.status(400).send({
+        message: `Failed to create new room: ${err.message}`
+      })
     })
   } else {
     // throw error if data is incomplete.
-    res.status(400).send()
+    return res.status(400).send()
   }
 })
 
@@ -144,15 +148,17 @@ app.post('/rooms/:roomCode/join', function (req, res) {
     // find room by roomCode, add user to it, and populate the array of users in room
     dbhelper.joinRoom(req.body.userId, req.params.roomCode).then((room) => {
       // return data for room
-      res.status(200).send({
+      return res.status(200).send({
         room: room
       })
     }).catch(err => {
-      res.status(400).send(`Failed to add user to room: ${err.message}`)
+      return res.status(400).send({
+        message: `Failed to add user to room: ${err.message}`
+      })
     })
   } else {
     // throw error if data is incomplete.
-    res.status(400).send()
+    return res.status(400).send()
   }
 })
 
@@ -166,13 +172,15 @@ app.post('/rooms/:roomCode/leave', function (req, res) {
   if (req.params.roomCode != null && req.body.userId != null) {
     // find room by code and leave it
     dbhelper.leaveRoom(req.body.userId, req.params.roomCode).then(() => {
-      res.sendStatus(200)
+      return res.sendStatus(200)
     }).catch((err) => {
-      res.status(400).send(`Failed to remove user from room: ${err.message}`)
+      return res.status(400).send({
+        message: `Failed to remove user from room: ${err.message}`
+      })
     })
   } else {
     // throw error if data is incomplete
-    res.status(400).send()
+    return res.status(400).send()
   }
 })
 
@@ -185,12 +193,16 @@ app.get('/rooms/:roomId/messages', function (req, res) {
   // get messages for a room by id
   dbhelper.getRoomMessages(req.params.roomId).then((room) => {
     if (room.participants.includes(req.body.userId)) {
-      res.status(200).send(room.messages)
+      return res.status(200).send(room.messages)
     } else {
-      res.status(400).send(`You are not authorized to view this room's messages.`)
+      return res.status(400).send({
+        message: `You are not authorized to view this room's messages.`
+      })
     }
   }).catch((err) => {
-    res.status(400).send(`Unable to retrieve room messages: ${err.message}`)
+    return res.status(400).send({
+      message: `Unable to retrieve room messages: ${err.message}`
+    })
   })
 })
 
@@ -203,26 +215,32 @@ app.post('/rooms/:roomId/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   let result = null
-  // create message, then add it to a room
-  let messageWrites = req.body.messages.map((message) => {
-    return new Promise((resolve, reject) => {
-      // insert each message into DB collection
-      dbhelper.sendMessageToRoom(message, req.body.userId, req.params.roomId)
-        .then((room) => {
-          result = room
-          resolve()
-        })
-        .catch((err) => {
-          console.log(`Error writing message to room: ${err.message}`)
-          reject()
-        })
+  if (req.params.roomId != null && req.body.userId != null && req.body.messages != null) {
+    // create message, then add it to a room
+    let messageWrites = req.body.messages.map((message) => {
+      return new Promise((resolve, reject) => {
+        // insert each message into DB collection
+        dbhelper.sendMessageToRoom(message, req.body.userId, req.params.roomId)
+          .then((room) => {
+            result = room
+            resolve()
+          })
+          .catch((err) => {
+            console.log(`Error writing message to room: ${err.message}`)
+            reject()
+          })
+      })
     })
-  })
-  Promise.all(messageWrites).then(() => {
-    res.status(200).send(result.messages)
-  }).catch((err) => {
-    res.status(400).send(`Failed to send message to room: ${err.message}`)
-  })
+    Promise.all(messageWrites).then(() => {
+      return res.status(200).send(result.messages)
+    }).catch((err) => {
+      return res.status(400).send({
+        message: `Failed to send message to room: ${err.message}`
+      })
+    })
+  } else {
+    return res.status(400).send()
+  }
 })
 
 /**
@@ -231,12 +249,18 @@ app.post('/rooms/:roomId/messages', function (req, res) {
 app.delete('/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'DELETE')
   res.header('Content-Type', 'application/json')
-  dbhelper.deleteMessageById(req.body.messageId)
-    .then(() => {
-      res.sendStatus(200)
-    }).catch((err) => {
-      res.status(400).send(`Failed to delete message: ${err.message}`)
-    })
+  if (req.body.messageId != null) {
+    dbhelper.deleteMessageById(req.body.messageId)
+      .then(() => {
+        return res.sendStatus(200)
+      }).catch((err) => {
+        return res.status(400).send({
+          message: `Failed to delete message: ${err.message}`
+        })
+      })
+  } else {
+    return res.status(400).send()
+  }
 })
 
 /**
@@ -251,7 +275,9 @@ app.get('/users/:userId', function (req, res) {
         user: doc
       })
     }).catch((err) => {
-      res.status(400).send(`Failed to get user: ${err.message}`)
+      return res.status(400).send({
+        message: `Failed to get user: ${err.message}`
+      })
     })
 })
 
@@ -263,28 +289,36 @@ app.get('/users/:userId', function (req, res) {
 app.post('/users', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
-  // create new user
-  bcrypt.hash(req.body.password, 8).then((hashedPassword) => {
-    dbhelper.createUserProfile(req.body.name, req.body.email, hashedPassword)
-      .then((user) => {
-        let token = jwt.sign({
-          id: user._id
-        }, process.env.TOKEN_SECRET, {
-          expiresIn: 86400 // expires in 24 hours
+  if (req.body.email != null && req.body.name != null && req.body.password != null) {
+    // create new user
+    bcrypt.hash(req.body.password, 8).then((hashedPassword) => {
+      dbhelper.createUserProfile(req.body.name, req.body.email, hashedPassword)
+        .then((user) => {
+          let token = jwt.sign({
+            id: user._id
+          }, process.env.TOKEN_SECRET, {
+            expiresIn: 86400 // expires in 24 hours
+          })
+          res.status(200).send({
+            auth: true,
+            token: token,
+            user: user
+          })
+        }).catch((err) => {
+          console.log(err)
+          return res.status(400).send({
+            message: `There was a problem logging in user.`
+          })
         })
-        res.status(200).send({
-          auth: true,
-          token: token,
-          user: user
-        })
-      }).catch((err) => {
-        console.log(err)
-        return res.status(400).send(`There was a problem logging in user.`)
+    }).catch((err) => {
+      console.log(err)
+      return res.status(400).send({
+        message: `There was a problem registering the user: ${err}`
       })
-  }).catch((err) => {
-    console.log(err)
-    return res.status(400).send(`There was a problem registering the user: ${err}`)
-  })
+    })
+  } else {
+    return res.status(400).send()
+  }
 })
 
 /**
@@ -294,35 +328,46 @@ app.post('/users', function (req, res) {
 app.post('/users/login', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
-  dbhelper.getUserProfileByEmail(req.body.email).then((doc) => {
-    if (!doc) {
-      return res.status(404).send('No user found.')
-    }
-    bcrypt.compare(req.body.password, doc.password).then((passwordIsValid) => {
-      if (!passwordIsValid) {
+  if (req.body.email != null && req.body.password != null) {
+    dbhelper.getUserProfileByEmail(req.body.email).then((doc) => {
+      if (!doc) {
         return res.status(401).send({
           auth: false,
           token: null
         })
       }
-      let token = jwt.sign({
-        id: doc._id
-      }, process.env.TOKEN_SECRET, {
-        expiresIn: 86400 // expires in 24 hours
-      })
-      res.status(200).send({
-        auth: true,
-        token: token,
-        user: doc
+      bcrypt.compare(req.body.password, doc.password).then((passwordIsValid) => {
+        if (!passwordIsValid) {
+          return res.status(401).send({
+            auth: false,
+            token: null
+          })
+        }
+        let token = jwt.sign({
+          id: doc._id
+        }, process.env.TOKEN_SECRET, {
+          expiresIn: 86400 // expires in 24 hours
+        })
+        return res.status(200).send({
+          auth: true,
+          token: token,
+          user: doc
+        })
+      }).catch((err) => {
+        console.log(err)
+        return res.status(500).send({
+          message: 'Server error.'
+        })
       })
     }).catch((err) => {
       console.log(err)
-      return res.status(500).send('Server error.')
+      return res.status(400).send({
+        message: 'Error logging in.'
+      })
     })
-  }).catch((err) => {
-    console.log(err)
-    return res.status(400).send('Error logging in.')
-  })
+  } else {
+    return res.status(400).send()
+  }
 })
 
 /**
@@ -334,41 +379,52 @@ app.post('/users/login', function (req, res) {
 app.put('/users', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'PUT')
   res.header('Content-Type', 'application/json')
-  // check new values for null, only include if not null
-  let updated = {}
-  if (req.body.updatedProperties.name) updated.name = req.body.updatedProperties.name
-  if (req.body.updatedProperties.email) updated.email = req.body.updatedProperties.email
 
-  // if password is being updated, hash with bcrypt before doing update operation
-  console.log(req.body)
-  if (req.body.updatedProperties.password != undefined) {
-    console.log('hashing password')
-    bcrypt.hash(req.body.updatedProperties.password, 8)
-      .then((hashedPassword) => {
-        updated.password = hashedPassword
-        // get user belonging to that context GUID and update their properties
-        dbhelper.updateUserProfile(req.body.userId, updated)
+  if (req.body.userId != null) {
+    // check new values for null, only include if not null
+    let updated = {}
+    if (req.body.updatedProperties.name) updated.name = req.body.updatedProperties.name
+    if (req.body.updatedProperties.email) updated.email = req.body.updatedProperties.email
+
+    // if password is being updated, hash with bcrypt before doing update operation
+    console.log(req.body)
+    if (req.body.updatedProperties.password != undefined) {
+      console.log('hashing password')
+      bcrypt.hash(req.body.updatedProperties.password, 8)
+        .then((hashedPassword) => {
+          updated.password = hashedPassword
+          // get user belonging to that context GUID and update their properties
+          dbhelper.updateUserProfile(req.body.userId, updated)
+            .then((user) => {
+              return res.status(200).send({
+                user: user
+              })
+            }).catch((err) => {
+              return res.status(400).send({
+                message: `Failed to update account: ${err.message}`
+              })
+            })
+        }).catch((err) => {
+          return res.status(400).send({
+            message: `Failed to update account: ${err.message}`
+          })
+        })
+    } else {
+      // get user belonging to that context GUID and update their properties
+      dbhelper.updateUserProfile(req.body.id, updated)
         .then((user) => {
-          res.status(200).send({
+          return res.status(200).send({
             user: user
           })
         }).catch((err) => {
-          res.status(400).send(`Failed to update account: ${err.message}`)
+          console.log(err)
+          return res.status(400).send({
+            message: `Failed to update account: ${err.message}`
+          })
         })
-      }).catch((err) => {
-        res.status(400).send(`Failed to update account: ${err.message}`)
-      })
+    }
   } else {
-    // get user belonging to that context GUID and update their properties
-    dbhelper.updateUserProfile(req.body.id, updated)
-    .then((user) => {
-      res.status(200).send({
-        user: user
-      })
-    }).catch((err) => {
-      console.log(err)
-      res.status(400).send(`Failed to update account: ${err.message}`)
-    })
+    return res.status(400).send()
   }
 })
 

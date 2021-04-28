@@ -88,6 +88,15 @@ describe('POST /rooms', () => {
         done()
       })
   })
+  it(`Returns an error if the userId is not specified.`, done => {
+    agent
+      .post('/rooms')
+      .send({})
+      .expect(400)
+      .then(() => {
+        done()
+      })
+  })
 })
 
 describe('POST /rooms/:roomCode/join', () => {
@@ -102,6 +111,15 @@ describe('POST /rooms/:roomCode/join', () => {
       .then(res => {
         expect(res.body.room.entryCode).toBe('ABCD')
         expect(res.body.room.participants.length).toBe(3)
+        done()
+      })
+  })
+  it(`Returns an error if the userId is not specified.`, done => {
+    agent
+      .post('/rooms/ABCD/join')
+      .send({})
+      .expect(400)
+      .then(() => {
         done()
       })
   })
@@ -147,6 +165,15 @@ describe('POST /rooms/:roomCode/leave', () => {
           })
       })
   })
+  it(`Returns an error if the userId is not specified.`, done => {
+    agent
+      .post('/rooms/ABCD/leave')
+      .send({})
+      .expect(400)
+      .then(() => {
+        done()
+      })
+  })
 })
 
 describe('GET /rooms/:roomId/messages', () => {
@@ -160,6 +187,26 @@ describe('GET /rooms/:roomId/messages', () => {
       .expect(200)
       .then(res => {
         expect(res.body.length).toBe(2)
+        done()
+      })
+  })
+  it(`Returns an error if the userId is not authorized.`, async (done) => {
+    const room = await Room.findOne({})
+    agent
+      .get(`/rooms/${room._id}/messages`)
+      .send({})
+      .expect(400)
+      .then(() => {
+        done()
+      })
+  })
+  it(`Returns an error if the userId is not specified.`, async (done) => {
+    const room = await Room.findOne({})
+    agent
+      .get(`/rooms/${room._id}/messages`)
+      .send({})
+      .expect(400)
+      .then(() => {
         done()
       })
   })
@@ -210,6 +257,41 @@ describe('POST /rooms/:roomId/messages', () => {
         done()
       })
   })
+  it(`Returns an error if the userId is not specified.`, async (done) => {
+    const room = await Room.findOne({})
+    agent
+      .post(`/rooms/${room._id}/messages`)
+      .send({
+        messages: [{
+            title: 'Test Message 5',
+            imageData: 'TALKJLASJD',
+            background: 'blue'
+          },
+          {
+            "title": 'Test Message 6',
+            "imageData": 'TALKJLASJD',
+            "background": 'white'
+          }
+        ],
+      })
+      .expect(400)
+      .then(() => {
+        done()
+      })
+  })
+  it('Returns an error if messages are not specified.', async (done) => {
+    const user = await User.findOne({})
+    const room = await Room.findOne({})
+    agent
+      .post(`/rooms/${room._id}/messages`)
+      .send({
+        userId: user._id
+      })
+      .expect(400)
+      .then(() => {
+        done()
+      })
+  })
 })
 
 describe('DELETE /messages', () => {
@@ -221,6 +303,15 @@ describe('DELETE /messages', () => {
         messageId: message._id
       })
       .expect(200)
+      .then(() => {
+        done()
+      })
+  })
+  it(`Returns an error if the userId is not specified.`, done => {
+    agent
+      .delete('/messages')
+      .send({})
+      .expect(400)
       .then(() => {
         done()
       })
@@ -240,6 +331,7 @@ describe('GET /users/:userId', () => {
   })
 })
 
+// TODO: add tests for duplicate emails
 describe('POST /users', () => {
   it('Adds a new user profile.', done => {
     const newUser = {
@@ -255,6 +347,15 @@ describe('POST /users', () => {
         expect(res.body.user.name).toBe(newUser.name)
         expect(res.body.user.email).toBe(newUser.email)
         expect(bcrypt.compareSync(res.body.user.password, newUser.password))
+        done()
+      })
+  })
+  it(`Returns an error if the user info is not specified.`, done => {
+    agent
+      .post('/users')
+      .send({})
+      .expect(400)
+      .then(() => {
         done()
       })
   })
@@ -275,10 +376,49 @@ describe('POST /users/login', () => {
         done()
       })
   })
+  it(`Returns an error if the password is not correct.`, done => {
+    agent
+      .post('/users/login')
+      .send({
+        email: 'test@test.com',
+        password: '123'
+      })
+      .expect(401)
+      .then(res => {
+        expect(res.body.auth).toBe(false)
+        expect(res.body.token).toBe(null)
+        done()
+      })
+  })
+  it(`Returns an error if the email is not correct.`, done => {
+    agent
+      .post('/users/login')
+      .send({
+        email: 'abc@test.com',
+        password: 'abcd'
+      })
+      .expect(401)
+      .then(res => {
+        expect(res.body.auth).toBe(false)
+        expect(res.body.token).toBe(null)
+        done()
+      })
+  })
+  it(`Returns an error if the login info is not specified.`, done => {
+    agent
+      .post('/users/login')
+      .send({})
+      .expect(400)
+      .then(() => {
+        done()
+      })
+  })
 })
 
+// TODO: add tests for duplicate emails
 describe('PUT /users', async () => {
-  it('Updates the user profile (no password)', async (done) => {
+  // use describe to make the tests synchronous (avoid bcrypt issue)
+  describe('Updates the user profile (no password)', async (done) => {
     const user = await User.findOne({})
     agent
       .post('/users')
@@ -296,7 +436,8 @@ describe('PUT /users', async () => {
         done()
       })
   })
-  it('Updates the user profile (with password)', async (done) => {
+  // use describe to make the tests synchronous
+  describe('Updates the user profile (with password)', async (done) => {
     const user = await User.findOne({})
     agent
       .put('/users')
@@ -309,6 +450,31 @@ describe('PUT /users', async () => {
       .expect(200)
       .then(res => {
         expect(bcrypt.compareSync(res.body.user.password, 'cdef'))
+        done()
+      })
+  })
+  describe('Handles situations where no updated data is provided', async (done) => {
+    const user = await User.findOne({})
+    agent
+      .put('/users')
+      .send({
+        userId: user._id
+      })
+      .expect(200)
+      .then(() => {
+        done()
+      })
+  })
+  describe(`Returns an error if the login info is not specified.`, done => {
+    agent
+      .put('/users')
+      .send({
+        updatedProperties: {
+          password: 'cdef'
+        }
+      })
+      .expect(400)
+      .then(() => {
         done()
       })
   })
