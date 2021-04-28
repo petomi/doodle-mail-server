@@ -9,34 +9,28 @@ const cors = require('cors')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const nanoid = require('nanoid')
-const mongoose = require('mongoose')
-const ObjectId = mongoose.Types.ObjectId
+const dbhelper = require('./dbhelper')
 // const multer = require('multer')
 // const fs = require('fs')
-// import mongoose schema and assign model names
-const models = require('./models/schema.js') 
-const User = models.user
-const Message = models.message
-const Room = models.room
-// const Avatar = models.avatar
 
+/**
+ * Configure Express Server
+ */
 const app = express()
-
-// Express server
 const staticFileMiddleware = express.static(path.resolve(__dirname) + '/dist')
-console.log(path.resolve(__dirname) + '/dist')
 app.use(staticFileMiddleware)
-app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.urlencoded({
+  extended: false
+}))
 app.use(bodyParser.json())
 
 // CORS setup
-
 var allowedOrigins = process.env.ALLOWED_ORIGINS.split(' ')
 // let allowedOrigins = '*'
 app.use(cors({
   origin: function (origin, callback) {
     if (process.env.NODE_ENV !== 'production') {
-      // allow requests with no origin 
+      // allow requests with no origin
       // (like mobile apps or curl requests)
       if (!origin) return callback(null, true)
     } else {
@@ -50,104 +44,112 @@ app.use(cors({
   },
   credentials: true,
   exposedHeaders: ['origin', 'X-requested-with', 'Content-Type', 'Accept']
-})) 
+}))
 
-// connect to mongodb and ensure it works before starting server
-mongoose.set('useFindAndModify', false)
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhosts:27017/test', { useNewUrlParser: true, useUnifiedTopology: true })
-// if connection is successful, create DB and initialize server
-var db = mongoose.connection
-console.log('Database connection ready.')
-// bind connection on error event
-db.on('error', console.error.bind(console,  'MongoDB connection error:'))
+// only connect to mongo and start web server if not a test
+if (process.env.NODE_ENV !== 'test') {
+  // connect to Mongo DB instance
+  dbhelper.createConnection(process.env.MONGO_URL)
 
-// start server
-var port = process.env.PORT || 5000
-app.listen(port)
-console.log('server started on port: ' + port)
+  // start server
+  var port = process.env.PORT || 5000
+  app.listen(port)
+  console.log('server started on port: ' + port)
+}
 
-//// ROUTES /////
+/**
+ * Set up logging method
+ */
+const logWithDate = (message, isError) => {
+  const currentTime = Date.now()
+  if(isError) {
+    console.error(`${currentTime}: ${message}`)
+  } else {
+    console.log(`${currentTime}: ${message}`)
+  }
+}
 
-// TODO - add logging to all endpoints
-// TODO - refactor all DB updates to separate functions
-// TODO - add unit tests with supertest
-// TODO - create API endpoint documentation from comments (automated?)
-// TODO - create automated test runs using CI before pushing to heroku
-// TODO - Create README with basic instructions and add CI tag to github repo readme
-// TODO - update client with all changes
+
+/**
+ * API Routes
+ */
+// TODO - create Express API endpoint documentation from comments (automated?) - use swagger-ui and swagger-jsdoc
 
 // home/test page
 app.get('/', function (req, res) {
-    res.header('Access-Control-Allow-Methods', 'GET')
-    res.status(200).send('Welcome to doodle-mail!')
+  res.header('Access-Control-Allow-Methods', 'GET')
+  logWithDate(`@GET /`)
+  return res.status(200).send('Welcome to doodle-mail!')
 })
 
-/** 
+/**
  * Get all room basic info (only accessible in dev environment)
  */
-app.get('/rooms/info', function(req, res) {
+app.get('/rooms/info', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
+  logWithDate(`@GET /rooms/info`)
   if (process.env.NODE_ENV !== 'production') {
-    Room.find({}).then((rooms) => {
-      res.status(200).send({ rooms: rooms })
+    dbhelper.getAllRoomInfo().then((rooms) => {
+      return res.status(200).send({
+        rooms: rooms
+      })
     })
-  }
-  else {
-    res.status(200).send('Nice try :)')
+  } else {
+    logWithDate(`Endpoint not allowed in production environment`)
+    return res.status(200).send('Nice try :)')
   }
 })
 
 /**
  * Get specific room info, including messages
  */
-app.get('/rooms/:roomCode/info', function(req, res) {
+app.get('/rooms/:roomCode/info', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
   res.header('Content-Type', 'application/json')
+  logWithDate(`@GET /rooms/${req.params.roomCode}/info`)
   if (req.params.roomCode != null) {
-    console.log(`Finding room: ${req.params.roomCode}`)
-    Room.findOne({
-      entryCode: req.params.roomCode
-    }).populate({
-      path: 'participants',
-      select: '-email -password'
-    }).populate({
-      path: 'messages',
-      select: '-room',
-      populate: {
-        path: 'author',
-        select: '-email-password'
-      }
-    }).then(function (room) {
-        res.status(200).send({ room: room })
-    }).catch((err) => { 
-      res.status(400).send(`Failed to get room info: ${err.message}`)
+    logWithDate(`Finding room: ${req.params.roomCode}`)
+    dbhelper.getRoomInfo(req.params.roomCode).then(function (room) {
+      return res.status(200).send({
+        room: room
+      })
+    }).catch((err) => {
+      logWithDate(`Error finding room ${req.params.roomCode}: ${err}`, true)
+      return res.status(400).send({
+        message: `Failed to get room info`
+      })
     })
   } else {
-    res.status(400).send()
+    logWithDate(`Missing room code in URL`)
+    return res.status(400).send()
   }
 })
 
-/** 
+/**
  * Create a new room
  */
- app.post('/rooms', function (req, res) {
+app.post('/rooms', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
-  if (req.body.user != null) {
+  logWithDate(`@POST /rooms`)
+  if (req.body.userId != null) {
     // create a room with unique 4 char guid and add user to it
     const roomCode = nanoid.nanoid(4)
-    Room.create({
-      entryCode: roomCode,
-      participants: [req.body.user],
-      messages: []
-    }).then(function(room) {
-      res.status(200).send({ room: room })
+    logWithDate(`Creating room for user: ${req.body.userId} with code: ${roomCode}`)
+    dbhelper.createRoom(req.body.userId, roomCode).then(function (room) {
+      return res.status(200).send({
+        room: room
+      })
     }).catch((err) => {
-      res.status(400).send(`Failed to create new room: ${err.message}`)
+      logWithDate(`Failed to create room for user ${req.body.userId}: ${err}`, true)
+      return res.status(400).send({
+        message: `Failed to create new room`
+      })
     })
   } else {
     // throw error if data is incomplete.
-    res.status(400).send()
+    logWithDate(`Missing userId in request body`)
+    return res.status(400).send()
   }
 })
 
@@ -155,43 +157,29 @@ app.get('/rooms/:roomCode/info', function(req, res) {
 /**
  * Join room using access code
  */
-app.post('/rooms/:roomCode/join', function(req, res) {
+app.post('/rooms/:roomCode/join', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
+  logWithDate(`@POST /rooms/${req.params.roomCode}/join`)
   // join an existing room using a code
-  if (req.params.roomCode != null && req.body.user != null) {
+  if (req.params.roomCode != null && req.body.userId != null) {
+    logWithDate(`User ${req.body.userId} attempting to join room with code ${req.params.roomCode}`)
     // find room by roomCode, add user to it, and populate the array of users in room
-    Room.findOneAndUpdate(
-      { 
-        entryCode: req.params.roomCode
-      },
-      {
-        $push: {
-          participants: new ObjectId(req.body.user)
-        }
-      },
-      {
-        new: true // get result after performing the update
-      }
-    ).populate({
-        path: 'participants',
-        select: '-email -password'
-    }).populate({
-        path: 'messages',
-        select: '-room',
-        populate: {
-          path: 'author',
-          select: '-email-password'
-        }
-    }).then((room) => {
+    dbhelper.joinRoom(req.body.userId, req.params.roomCode).then((room) => {
       // return data for room
-      res.status(200).send({ room: room })
+      return res.status(200).send({
+        room: room
+      })
     }).catch(err => {
-      res.status(400).send(`Failed to add user to room: ${err.message}`)
+      logWithDate(`Failed to add user ${req.body.userId} to room ${req.params.roomCode}: ${err}`, true)
+      return res.status(400).send({
+        message: `Failed to add user to room`
+      })
     })
   } else {
+    logWithDate(`Missing roomCode in URL params or user Id in request body`)
     // throw error if data is incomplete.
-    res.status(400).send()
+    return res.status(400).send()
   }
 })
 
@@ -201,35 +189,23 @@ app.post('/rooms/:roomCode/join', function(req, res) {
 app.post('/rooms/:roomCode/leave', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
+  logWithDate(`@POST /rooms/${req.params.roomCode}/leave`)
   // join an existing room using a code
-  if (req.params.roomCode != null && req.body.user != null) {
+  if (req.params.roomCode != null && req.body.userId != null) {
+    logWithDate(`User ${req.body.userId} attempting to leave room with code ${req.params.roomCode}`)
     // find room by code and leave it
-    Room.findOneAndUpdate(
-      {
-        entryCode: req.params.roomCode
-      },
-      {
-        // remove user from room by id
-        $pull: { participants: new ObjectId(req.body.user) }
-      },
-      {
-        new: true // get result after performing the update.
-      }).then((room) => {
-        // if room is empty, delete room
-        if (room.participants.length === 0) {
-          Room.deleteOne({ _id: room._id }, function (err) {
-            if (err) {
-              res.status(400).send(`Failed to remove room ${err.message}`)
-            }
-          })
-        }
-        res.sendStatus(200)
-      }).catch((err) => {
-        res.status(400).send(`Failed to remove user from room: ${err.message}`)
+    dbhelper.leaveRoom(req.body.userId, req.params.roomCode).then(() => {
+      return res.sendStatus(200)
+    }).catch((err) => {
+      logWithDate(`Failed to remove user ${req.body.userId} from room ${req.params.roomCode}: ${err}`, true)
+      return res.status(400).send({
+        message: `Failed to remove user from room`
       })
+    })
   } else {
+    logWithDate(`Missing room code in URL parameters or userId in request body`)
     // throw error if data is incomplete
-    res.status(400).send()
+    return res.status(400).send()
   }
 })
 
@@ -239,87 +215,91 @@ app.post('/rooms/:roomCode/leave', function (req, res) {
 app.get('/rooms/:roomId/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
   res.header('Content-Type', 'application/json')
+  logWithDate(`@GET /rooms/${req.params.roomId}/messages`)
   // get messages for a room by id
-  Room.findById(req.params.roomId)
-  .populate({
-    path: 'messages',
-    select: '-room',
-    populate: {
-      path: 'author',
-      select: '-email -password'
-    }
-  })
-  .then((room) => {
-    if (room.participants.includes(req.body.user)) {
-      res.status(200).send(room.messages)
-    }
-    else {
-      res.status(400).send(`You are not authorized to view this room's messages.`)
+  dbhelper.getRoomMessages(req.params.roomId).then((room) => {
+    if (room.participants.includes(req.body.userId)) {
+      logWithDate(`Getting messages for room ${req.params.roomId} for user ${req.body.userId}`)
+      return res.status(200).send(room.messages)
+    } else {
+      logWithDate(`User ${req.body.userId} is not authorized to view messages for room ${req.params.roomId}`)
+      return res.status(401).send({
+        message: `You are not authorized to view this room's messages.`
+      })
     }
   }).catch((err) => {
-    res.status(400).send(`Unable to retrieve room messages: ${err.message}`)
+    logWithDate(`Unable to retrieve messages for room ${req.params.roomId} for user ${req.body.userId}: ${err}`, true)
+    return res.status(400).send({
+      message: `Unable to retrieve room messages`
+    })
   })
 })
 
 /**
  * Write a message to a room by room id.
  * Returns list of room messages.
- * Requires fields: user, message: { title, imageData, background } 
+ * Requires fields: user, message: { title, imageData, background }
  */
 app.post('/rooms/:roomId/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
-  // create message, then add it to a room
-  req.body.messages.forEach( function(message) {
-    // insert each message into DB collection
-    Message.create({
-      author: new ObjectId(req.body.user),
-      room: new ObjectId(req.params.roomId),
-      title: message.title,
-      date: Date.now(),
-      imageData: message.imageData,
-      background: message.background
-    })
-    .then((message) => {
-      Room.findByIdAndUpdate(req.params.roomId,
-        {
-          $push: {
-            messages: new ObjectId(message._id)
-          }
-        },
-        {
-          new: true
-        }
-      ).populate({
-        path: 'messages',
-        select: '-room',
-        populate: {
-          path: 'author',
-          select: '-email -password'
-        }
-      }).then((room) => {
-        res.status(200).send(room.messages)
-      }).catch((err) => {
-        res.status(400).send(`Failed to send message to room: ${err.message}`)
+  logWithDate(`@POST /rooms/${req.params.roomId}/messages`)
+  let result = null
+  if (req.params.roomId != null && req.body.userId != null && req.body.messages != null) {
+    logWithDate(`Sending message from user ${req.body.userId} to room ${req.params.roomId}`)
+    // create message, then add it to a room
+    let messageWrites = req.body.messages.map((message) => {
+      return new Promise((resolve, reject) => {
+        // insert each message into DB collection
+        dbhelper.sendMessageToRoom(message, req.body.userId, req.params.roomId)
+          .then((room) => {
+            result = room
+            resolve()
+          })
+          .catch((err) => {
+            logWithDate(`Error writing message from user ${req.body.userId} to room ${req.params.roomId}: ${err}`, true)
+            reject()
+          })
       })
-    }).catch((err) => {
-      res.status(400).send(`Failed to create message: ${err.message}`)
     })
-  })
+    Promise.all(messageWrites).then(() => {
+      logWithDate(`Wrote all messages successfully.`)
+      return res.status(200).send(result.messages)
+    }).catch((err) => {
+      logWithDate(`Failed to send messages from user ${req.body.userId} to room ${req.params.roomId}: ${err}`, true)
+      return res.status(400).send({
+        message: `Failed to send message to room`
+      })
+    })
+  } else {
+    logWithDate(`Missing roomId in URL params or userId, messages objects in request body`)
+    return res.status(400).send()
+  }
 })
 
 /**
  * Delete a message by message id
  */
- app.delete('/messages', function (req, res) {
+app.delete('/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'DELETE')
   res.header('Content-Type', 'application/json')
-  Message.findByIdAndDelete(req.body.message)
-  .then(() => {
-    res.sendStatus(200)
-  }).catch((err) => {
-    res.status(400).send(`Failed to delete message: ${err.message}`)
-  }) 
+  logWithDate(`@DELETE /messages`)
+  if (req.body.messageId != null) {
+    logWithDate(`Deleting message with id ${req.body.messageId}`)
+    dbhelper.deleteMessageById(req.body.messageId)
+      .then(() => {
+        logWithDate(`Message deleted successfully`)
+        return res.sendStatus(200)
+      }).catch((err) => {
+        logWithDate(`Failed to delete message with id ${req.body.messageId}: ${err}`, true)
+        return res.status(400).send({
+          message: `Failed to delete message`
+        })
+      })
+  } else {
+    logWithDate(`Missing messageId in request body`)
+    return res.status(400).send()
+  }
 })
 
 /**
@@ -328,59 +308,79 @@ app.post('/rooms/:roomId/messages', function (req, res) {
 app.get('/users/:userId', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
   res.header('Content-Type', 'application/json')
-  User.findById(req.params.userId, {
-    name: 1,
-    email: 1
-  })
-  .then((doc) => {
-      return res.status(200).json({ user: doc })
-  }).catch((err) => {
-    res.status(400).send(`Failed to get user: ${err.message}`)
-  })
+  logWithDate(`@GET /users/${req.params.userId}`)
+  dbhelper.getUserProfileById(req.params.userId)
+    .then((doc) => {
+      logWithDate(`Retrieved data for user ${req.params.userId}`)
+      return res.status(200).json({
+        user: doc
+      })
+    }).catch((err) => {
+      logWithDate(`Unable to get data for user ${req.params.userId}: ${err}`, true)
+      return res.status(400).send({
+        message: `Failed to get user`
+      })
+    })
 })
 
 /**
  * Create a new user account
  * Takes in an object containing name, email, and password fields
  */
-// TODO: check for duplicate user names and emails before allowing signup
 app.post('/users', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
-  // create new user
-  bcrypt.hash(req.body.password, 8).then((hashedPassword) => {
-    User.create({
-      name: req.body.name,
-      email: req.body.email,
-      password: hashedPassword,
-      // avatar: req.body.avatar, 
-    }).then(() => {
-      // log in user with token
-      User.findOne({ email: req.body.email })
-        .then((user) => {
-          let token = jwt.sign({
-            id: user._id
-          }, process.env.TOKEN_SECRET, {
-            expiresIn: 86400 // expires in 24 hours
+  logWithDate(`@POST /users`)
+  if (req.body.email != null && req.body.name != null && req.body.password != null) {
+    logWithDate(`Checking for existing account with email: ${req.body.email}`)
+    // check if email is already in use
+    dbhelper.getUserProfileByEmail(req.body.email)
+      .then((user) => {
+        // if there is a user, do not create account
+        if (user != null) {
+          logWithDate(`Duplicate email found. Account not created.`)
+          return res.status(400).send({
+            message: `The email address provided is already in use.`
           })
-          res.status(200).send({
-            auth: true,
-            token: token,
-            user: user
-          })
+        }
+        logWithDate(`Creating user ${req.body.name} with email ${req.body.password}`)
+        // create new user
+        bcrypt.hash(req.body.password, 8).then((hashedPassword) => {
+          dbhelper.createUserProfile(req.body.name, req.body.email, hashedPassword)
+            .then((user) => {
+              logWithDate(`Creating login token for newly created user`)
+              let token = jwt.sign({
+                id: user._id
+              }, process.env.TOKEN_SECRET, {
+                expiresIn: 86400 // expires in 24 hours
+              })
+              logWithDate(`Token created. User logged in.`)
+              return res.status(200).send({
+                auth: true,
+                token: token,
+                user: user
+              })
+            }).catch((err) => {
+              logWithDate(`Problem logging in user: ${err}`, true)
+              return res.status(400).send({
+                message: `There was a problem logging in user.`
+              })
+            })
         }).catch((err) => {
-          console.log(err)
-          return res.status(400).send(`There was a problem logging in user.`)
+          logWithDate(`There was a problem registering the user with email ${req.body.email}: ${err}`, true)
+          return res.status(400).send({
+            message: `There was a problem registering the user`
+          })
         })
-    }).catch((err) => {
-      console.log(err)
-      return res.status(400).send(`There was a problem registering the user: ${err}`)
-    })
-  }).catch((err) => {
-    console.log(err)
-    return res.status(500).send('Server error.')
-  })
-  
+      }).catch((err) => {
+        logWithDate(`Unable to search for existing user with email ${req.body.email}: ${err}`, true)
+        return res.status(400).send({
+          message: `Unable to search for existing user`
+        })
+      })
+  } else {
+    return res.status(400).send()
+  }
 })
 
 /**
@@ -390,37 +390,54 @@ app.post('/users', function (req, res) {
 app.post('/users/login', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
-  User.findOne({
-    email: req.body.email
-  }).then((doc) => {
-    if (!doc) {
-      return res.status(404).send('No user found.')
-    }
-    bcrypt.compare(req.body.password, doc.password).then((passwordIsValid) => {
-      if (!passwordIsValid) {
+  logWithDate(`@/users/login`)
+  if (req.body.email != null && req.body.password != null) {
+    logWithDate(`Getting user profile by email ${req.body.email}`)
+    dbhelper.getUserProfileByEmail(req.body.email).then((doc) => {
+      if (!doc) {
+        logWithDate(`No user found with that email`)
         return res.status(401).send({
           auth: false,
           token: null
         })
       }
-      let token = jwt.sign({
-        id: doc._id
-      }, process.env.TOKEN_SECRET, {
-        expiresIn: 86400 // expires in 24 hours
-      }) 
-      res.status(200).send({
-        auth: true,
-        token: token,
-        user: doc
+      bcrypt.compare(req.body.password, doc.password).then((passwordIsValid) => {
+        logWithDate(`Comparing login details`)
+        if (!passwordIsValid) {
+          logWithDate(`Login info invalid`)
+          return res.status(401).send({
+            auth: false,
+            token: null
+          })
+        }
+        logWithDate(`Login info valid, generating token`)
+        let token = jwt.sign({
+          id: doc._id
+        }, process.env.TOKEN_SECRET, {
+          expiresIn: 86400 // expires in 24 hours
+        })
+        logWithDate(`Token generated successfully and user logged in`)
+        return res.status(200).send({
+          auth: true,
+          token: token,
+          user: doc
+        })
+      }).catch((err) => {
+        logWithDate(`Server error when attempting to decrypt password: ${err}`, true)
+        return res.status(500).send({
+          message: 'Server error'
+        })
       })
     }).catch((err) => {
-      console.log(err)
-      return res.status(500).send('Server error.')
+      logWithDate(`Error logging in: ${err}`, true)
+      return res.status(400).send({
+        message: 'Error logging in'
+      })
     })
-  }).catch((err) => {
-    console.log(err)
-    return res.status(400).send('Error logging in.')
-  })
+  } else {
+    logWithDate(`Missing email or password from request body`)
+    return res.status(400).send()
+  }
 })
 
 /**
@@ -432,46 +449,69 @@ app.post('/users/login', function (req, res) {
 app.put('/users', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'PUT')
   res.header('Content-Type', 'application/json')
-  // check new values for null, only include if not null
-  let updated = {}
-  if (req.body.updatedProperties.name) updated.name = req.body.updatedProperties.name
-  if (req.body.updatedProperties.email) updated.email = req.body.updatedProperties.email
-  
-  // if password is being updated, hash with bcrypt before doing update operation
-  if (req.body.updatedProperties.password) {
-    bcrypt.hash(req.body.updatedProperties.password, 8)
-    .then((hashedPassword) => {
-      updated.password = hashedPassword
-      // get user belonging to that context GUID and update their properties
-      // TODO - can refactor to be a function taking in "updated" object
-      User.findByIdAndUpdate(
-        req.body.id,
-        { 
-          $set: updated
+  logWithDate(`@PUT /users`)
+  if (req.body.userId != null && req.body.updatedProperties != null) {
+    logWithDate(`Updating account with user id ${req.body.userId}`)
+    // check if email is already in use
+    logWithDate(`Checking if email ${req.body.updatedProperties.email} is already in use`)
+    dbhelper.getUserProfileByEmail(req.body.email)
+      .then((user) => {
+        // if there is a user, do not create account
+        if (user != null) {
+          logWithDate(`Duplicate email found`)
+          return res.status(400).send({
+            message: `The email address provided is already in use.`
+          })
         }
-      ).then(() => {
-        res.sendStatus(200)
-      }).catch((err) => {
-        res.status(400).send(`Failed to update account: ${err.message}`)
-      })
-    }).catch((err) => {
-      res.status(400).send(`Failed to update account: ${err.message}`)
-    })
+        // check new values for null, only include if not null
+        let updated = {}
+        if (req.body.updatedProperties.name) updated.name = req.body.updatedProperties.name
+        if (req.body.updatedProperties.email) updated.email = req.body.updatedProperties.email
 
-  }
-  else {
-    // get user belonging to that context GUID and update their properties
-    // TODO - can refactor to be a function taking in "updated" object
-    User.findByIdAndUpdate(
-      req.body.id,
-      { 
-        $set: updated
-      }
-    ).then(() => {
-      res.sendStatus(200)
-    }).catch((err) => {
-      res.status(400).send(`Failed to update account: ${err.message}`)
-    })
+        // if password is being updated, hash with bcrypt before doing update operation
+        if (req.body.updatedProperties.password != undefined) {
+          logWithDate('Updating password')
+          bcrypt.hash(req.body.updatedProperties.password, 8)
+            .then((hashedPassword) => {
+              updated.password = hashedPassword
+              // get user belonging to that context GUID and update their properties
+              dbhelper.updateUserProfile(req.body.userId, updated)
+                .then((user) => {
+                  logWithDate(`User profile updated successfully`)
+                  return res.status(200).send({
+                    user: user
+                  })
+                }).catch((err) => {
+                  logWithDate(`Error updating user profile with id ${req.body.userId}: ${err}`, true)
+                  return res.status(400).send({
+                    message: `Failed to update account`
+                  })
+                })
+            }).catch((err) => {
+              logWithDate(`Failed to update user account with id ${req.body.userId}: ${err}`, true)
+              return res.status(400).send({
+                message: `Failed to update account`
+              })
+            })
+        } else {
+          // get user belonging to that context GUID and update their properties
+          dbhelper.updateUserProfile(req.body.userId, updated)
+            .then((user) => {
+              logWithDate(`User profile updated successfully`)
+              return res.status(200).send({
+                user: user
+              })
+            }).catch((err) => {
+              logWithDate(`Failed to update user profile with id ${req.body.userId}: ${err}`, true)
+              return res.status(400).send({
+                message: `Failed to update account`
+              })
+            })
+        }
+      })
+  } else {
+    logWithDate(`Missing either userId or updatedProperties in request body`)
+    return res.status(400).send()
   }
 })
 
@@ -490,3 +530,5 @@ app.put('/users', function (req, res) {
 //   }
 //   res.status(200).send()
 // })
+
+module.exports = app
