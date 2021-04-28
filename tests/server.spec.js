@@ -203,7 +203,7 @@ describe('GET /rooms/:roomId/messages', () => {
     agent
       .get(`/rooms/${room._id}/messages`)
       .send({})
-      .expect(400)
+      .expect(401)
       .then(() => {
         done()
       })
