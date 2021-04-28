@@ -46,7 +46,7 @@ app.use(cors({
   exposedHeaders: ['origin', 'X-requested-with', 'Content-Type', 'Accept']
 }))
 
-// keep tests from overwriting real data - TODO: use in memory DB in future to avoid this
+// keep tests from overwriting real data
 if (process.env.NODE_ENV !== 'test') {
   // connect to Mongo DB instance
   dbhelper.createConnection(process.env.MONGO_URL)

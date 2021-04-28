@@ -237,7 +237,6 @@ const getUserProfileByEmail = (email) => {
  * @param {string} email The email of the user being created.
  * @param {string} hashedPassword The password of the user being created, hashed and salted.
  * @returns {Promise<Object>} Promise object represents the created user profile.
- * @todo TODO: check for duplicate user names and emails before allowing signup
  */
 const createUserProfile = (name, email, hashedPassword) => {
   return new Promise(function (resolve, reject) {
