@@ -73,10 +73,7 @@ const logWithDate = (message, isError) => {
 /**
  * API Routes
  */
-// TODO - create Express API endpoint documentation from comments (automated?)
-// TODO - create automated test runs using CI before pushing to heroku
-// TODO - Create README with basic instructions and add CI tag to github repo readme
-// TODO - update front-end client with all changes
+// TODO - create Express API endpoint documentation from comments (automated?) - use swagger-ui and swagger-jsdoc
 
 // home/test page
 app.get('/', function (req, res) {
