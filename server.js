@@ -285,37 +285,51 @@ app.get('/users/:userId', function (req, res) {
  * Create a new user account
  * Takes in an object containing name, email, and password fields
  */
-// TODO: check for duplicate user names and emails before allowing signup
 app.post('/users', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   if (req.body.email != null && req.body.name != null && req.body.password != null) {
-    // create new user
-    bcrypt.hash(req.body.password, 8).then((hashedPassword) => {
-      dbhelper.createUserProfile(req.body.name, req.body.email, hashedPassword)
-        .then((user) => {
-          let token = jwt.sign({
-            id: user._id
-          }, process.env.TOKEN_SECRET, {
-            expiresIn: 86400 // expires in 24 hours
+    // check if email is already in use
+    dbhelper.getUserProfileByEmail(req.body.email)
+      .then((user) => {
+        // if there is a user, do not create account
+        if (user != null) {
+          return res.status(400).send({
+            message: `The email address provided is already in use.`
           })
-          res.status(200).send({
-            auth: true,
-            token: token,
-            user: user
-          })
+        }
+        // create new user
+        bcrypt.hash(req.body.password, 8).then((hashedPassword) => {
+          dbhelper.createUserProfile(req.body.name, req.body.email, hashedPassword)
+            .then((user) => {
+              let token = jwt.sign({
+                id: user._id
+              }, process.env.TOKEN_SECRET, {
+                expiresIn: 86400 // expires in 24 hours
+              })
+              return res.status(200).send({
+                auth: true,
+                token: token,
+                user: user
+              })
+            }).catch((err) => {
+              console.log(err)
+              return res.status(400).send({
+                message: `There was a problem logging in user.`
+              })
+            })
         }).catch((err) => {
           console.log(err)
           return res.status(400).send({
-            message: `There was a problem logging in user.`
+            message: `There was a problem registering the user: ${err}`
           })
         })
-    }).catch((err) => {
-      console.log(err)
-      return res.status(400).send({
-        message: `There was a problem registering the user: ${err}`
+      }).catch((err) => {
+        console.log(err)
+        return res.status(400).send({
+          message: `There is already a user with that email address: ${err}`
+        })
       })
-    })
   } else {
     return res.status(400).send()
   }
@@ -380,19 +394,45 @@ app.put('/users', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'PUT')
   res.header('Content-Type', 'application/json')
 
-  if (req.body.userId != null) {
-    // check new values for null, only include if not null
-    let updated = {}
-    if (req.body.updatedProperties.name) updated.name = req.body.updatedProperties.name
-    if (req.body.updatedProperties.email) updated.email = req.body.updatedProperties.email
+  if (req.body.userId != null && req.body.updatedProperties != null) {
+    // check if email is already in use
+    dbhelper.getUserProfileByEmail(req.body.email)
+      .then((user) => {
+        // if there is a user, do not create account
+        if (user != null) {
+          return res.status(400).send({
+            message: `The email address provided is already in use.`
+          })
+        }
+        // check new values for null, only include if not null
+        let updated = {}
+        if (req.body.updatedProperties.name) updated.name = req.body.updatedProperties.name
+        if (req.body.updatedProperties.email) updated.email = req.body.updatedProperties.email
 
-    // if password is being updated, hash with bcrypt before doing update operation
-    console.log(req.body)
-    if (req.body.updatedProperties.password != undefined) {
-      console.log('hashing password')
-      bcrypt.hash(req.body.updatedProperties.password, 8)
-        .then((hashedPassword) => {
-          updated.password = hashedPassword
+        // if password is being updated, hash with bcrypt before doing update operation
+        console.log(req.body)
+        if (req.body.updatedProperties.password != undefined) {
+          console.log('hashing password')
+          bcrypt.hash(req.body.updatedProperties.password, 8)
+            .then((hashedPassword) => {
+              updated.password = hashedPassword
+              // get user belonging to that context GUID and update their properties
+              dbhelper.updateUserProfile(req.body.userId, updated)
+                .then((user) => {
+                  return res.status(200).send({
+                    user: user
+                  })
+                }).catch((err) => {
+                  return res.status(400).send({
+                    message: `Failed to update account: ${err.message}`
+                  })
+                })
+            }).catch((err) => {
+              return res.status(400).send({
+                message: `Failed to update account: ${err.message}`
+              })
+            })
+        } else {
           // get user belonging to that context GUID and update their properties
           dbhelper.updateUserProfile(req.body.userId, updated)
             .then((user) => {
@@ -400,29 +440,13 @@ app.put('/users', function (req, res) {
                 user: user
               })
             }).catch((err) => {
+              console.log(err)
               return res.status(400).send({
                 message: `Failed to update account: ${err.message}`
               })
             })
-        }).catch((err) => {
-          return res.status(400).send({
-            message: `Failed to update account: ${err.message}`
-          })
-        })
-    } else {
-      // get user belonging to that context GUID and update their properties
-      dbhelper.updateUserProfile(req.body.id, updated)
-        .then((user) => {
-          return res.status(200).send({
-            user: user
-          })
-        }).catch((err) => {
-          console.log(err)
-          return res.status(400).send({
-            message: `Failed to update account: ${err.message}`
-          })
-        })
-    }
+        }
+      })
   } else {
     return res.status(400).send()
   }

@@ -331,7 +331,6 @@ describe('GET /users/:userId', () => {
   })
 })
 
-// TODO: add tests for duplicate emails
 describe('POST /users', () => {
   it('Adds a new user profile.', done => {
     const newUser = {
@@ -347,6 +346,19 @@ describe('POST /users', () => {
         expect(res.body.user.name).toBe(newUser.name)
         expect(res.body.user.email).toBe(newUser.email)
         expect(bcrypt.compareSync(res.body.user.password, newUser.password))
+        done()
+      })
+  })
+  it(`Returns an error if the user email is already in use.`, done => {
+    agent
+      .post('/users')
+      .send({
+        name: 'Test Test',
+        email: 'test@test.com',
+        password: 'abcd'
+      })
+      .expect(400)
+      .then(() => {
         done()
       })
   })
@@ -415,13 +427,12 @@ describe('POST /users/login', () => {
   })
 })
 
-// TODO: add tests for duplicate emails
 describe('PUT /users', async () => {
   // use describe to make the tests synchronous (avoid bcrypt issue)
-  describe('Updates the user profile (no password)', async (done) => {
+  it('Updates the user profile (no password)', async (done) => {
     const user = await User.findOne({})
     agent
-      .post('/users')
+      .put('/users')
       .send({
         userId: user._id,
         updatedProperties: {
@@ -437,7 +448,7 @@ describe('PUT /users', async () => {
       })
   })
   // use describe to make the tests synchronous
-  describe('Updates the user profile (with password)', async (done) => {
+  it('Updates the user profile (with password)', async (done) => {
     const user = await User.findOne({})
     agent
       .put('/users')
@@ -453,19 +464,32 @@ describe('PUT /users', async () => {
         done()
       })
   })
-  describe('Handles situations where no updated data is provided', async (done) => {
+  it('Handles situations where no updated data is provided', async (done) => {
     const user = await User.findOne({})
     agent
       .put('/users')
       .send({
         userId: user._id
       })
-      .expect(200)
+      .expect(400)
       .then(() => {
         done()
       })
   })
-  describe(`Returns an error if the login info is not specified.`, done => {
+  it(`Returns an error if the user email is already in use.`, done => {
+    agent
+      .post('/users')
+      .send({
+        name: 'Test Test',
+        email: 'test@test.com',
+        password: 'abcd'
+      })
+      .expect(400)
+      .then(() => {
+        done()
+      })
+  })
+  it(`Returns an error if the login info is not specified.`, done => {
     agent
       .put('/users')
       .send({
