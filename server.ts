@@ -802,4 +802,4 @@ app.put('/users', function (req: any, res: any) {
 //   res.status(200).send()
 // })
 
-module.exports = app
+export default app

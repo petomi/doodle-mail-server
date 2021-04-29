@@ -1,16 +1,10 @@
-import { IMessage } from "../models/message";
-import { IRoom } from "../models/room";
-import { IUser } from "../models/user";
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
+import Message, { IMessage } from "../models/message";
+import Room, { IRoom } from "../models/room";
+import User, { IUser } from "../models/user";
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 
-const mongoose = require('mongoose');
-const {
-  MongoMemoryServer
-} = require('mongodb-memory-server');
-const {
-  User,
-  Message,
-  Room
-} = require('../models/schema')
 const ObjectId = mongoose.Types.ObjectId
 
 // see: https://dev.to/ryuuto829/setup-in-memory-database-for-testing-node-js-and-mongoose-1kop
@@ -29,7 +23,7 @@ const connect = async () => {
 
   const mongoUri = await mongoServer.getUri();
   mongoose.set('useFindAndModify', false)
-  await mongoose.connect(mongoUri, opts, (err: any) => {
+  await mongoose.connect(mongoUri, opts, err => {
     if (err) {
       console.error(err);
     }
@@ -47,7 +41,7 @@ const clear = async () => {
   const collections = mongoose.connection.collections;
 
   for (const key in collections) {
-    await collections[key].deleteMany();
+    await collections[key].deleteMany({});
   }
 };
 
@@ -109,9 +103,52 @@ const seed = () => {
   })
 }
 
-module.exports = {
+/***
+ * Helper Methods
+ */
+const getRoom = async () => {
+  const room = await Room.findOne({})
+  if (room != null) {
+    return room
+  } else {
+    throw new Error(`No rooms in test db.`)
+  }
+}
+
+const getAllUsers = async () => {
+  const users = await User.find({})
+  if (users != null) {
+    return users
+  } else {
+    throw new Error(`No users in test db.`);
+  }
+}
+
+const getUser = async () => {
+  const user = await User.findOne({})
+  if (user != null) {
+    return user
+  } else {
+    throw new Error(`No users in test db.`)
+  }
+}
+
+const getMessage = async () => {
+  const message = await Message.findOne({})
+  if (message != null) {
+    return message
+  } else {
+    throw new Error(`No messages in test db.`)
+  }
+}
+
+export default {
   connect,
   close,
   clear,
-  seed
+  seed,
+  getMessage,
+  getRoom,
+  getUser,
+  getAllUsers
 };
