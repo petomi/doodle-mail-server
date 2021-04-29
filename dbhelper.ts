@@ -1,7 +1,7 @@
 import Message, { IMessage } from "./models/message"
 import Room, { IRoom } from "./models/room"
 import User, { IUser } from "./models/user"
-import mongoose from 'mongoose'
+import mongoose, { Query } from 'mongoose'
 import { IUpdatedUser } from "./models/updated-user"
 const ObjectId = mongoose.Types.ObjectId
 
@@ -32,7 +32,7 @@ const closeConnection = () : void => {
  * Gets info for all chat rooms.
  * @returns {Promise<Array<Object>>}
  */
-const getAllRoomInfo = () => {
+const getAllRoomInfo = () : Query<IRoom[], IRoom> => {
   return Room.find({})
 }
 
@@ -41,7 +41,7 @@ const getAllRoomInfo = () => {
  * @param {string} roomCode The 4 digit code used to join the room.
  * @returns {Promise<Object>} Promise object represents the room info.
  */
-const getRoomInfo = (roomCode: string) => {
+const getRoomInfo = (roomCode: string) : Query<IRoom | null, IRoom > => {
   return Room.findOne({
     entryCode: roomCode
   }).populate({
@@ -63,7 +63,7 @@ const getRoomInfo = (roomCode: string) => {
  * @param {string} roomCode The 4 digit code used to join the room.
  * @returns {Promise<Object>} Promise object represents the created room info.
  */
-const createRoom = (userId: string, roomCode: string) => {
+const createRoom = (userId: string, roomCode: string) : Promise<IRoom> => {
   return Room.create({
     entryCode: roomCode,
     participants: [userId],
@@ -78,7 +78,7 @@ const createRoom = (userId: string, roomCode: string) => {
  * @returns {Promise<Object>} Promise object represents the room after joining.
  * @todo TODO: check whether user is already part of room before adding them
  */
-const joinRoom = (userId: string, roomCode: string) => {
+const joinRoom = (userId: string, roomCode: string) : Query<IRoom | null, IRoom> => {
   return Room.findOneAndUpdate({
     entryCode: roomCode
   }, {
@@ -106,7 +106,7 @@ const joinRoom = (userId: string, roomCode: string) => {
  * @param {string} roomCode The 4 digit room code of the room being left.
  * @returns {Promise}
  */
-const leaveRoom = (userId: string, roomCode: string) => {
+const leaveRoom = (userId: string, roomCode: string) : Promise<void> => {
   return new Promise<void>(function (resolve, reject) {
     Room.findOneAndUpdate({
       entryCode: roomCode
@@ -140,7 +140,7 @@ const leaveRoom = (userId: string, roomCode: string) => {
  * @param {string} roomId The id of the room to get messages for.
  * @returns {Promise<Array<Object>>} Promise object represents an array of messages from the room.
  */
-const getRoomMessages = (roomId: string) => {
+const getRoomMessages = (roomId: string) : Query<IRoom | null, IRoom> => {
   return Room.findById(roomId)
     .populate({
       path: 'messages',
@@ -201,7 +201,7 @@ const sendMessageToRoom = (message: IMessage, userId: string, roomId: string) : 
  * @param {string} messageId The id of the message to delete.
  * @returns {Promise}
  */
-const deleteMessageById = (messageId: string) => {
+const deleteMessageById = (messageId: string) : Query<IMessage | null, IMessage> => {
   return Message.findByIdAndDelete(messageId)
 }
 
@@ -210,7 +210,7 @@ const deleteMessageById = (messageId: string) => {
  * @param {string} userId The id of the user being fetched.
  * @returns {Promise<Object>} Promise object represents the fetched user profile.
  */
-const getUserProfileById = (userId: string) => {
+const getUserProfileById = (userId: string) : Query<IUser | null, IUser> => {
   return User.findById(userId, {
     name: 1,
     email: 1
@@ -222,7 +222,7 @@ const getUserProfileById = (userId: string) => {
  * @param {string} email The email of the user being fetched.
  * @returns {Promise<Object>} Promise object represents the fetched user profile.
  */
-const getUserProfileByEmail = (email: string) => {
+const getUserProfileByEmail = (email: string) : Query<IUser | null, IUser> => {
   return User.findOne({
     email: email
   })
@@ -268,7 +268,7 @@ const createUserProfile = (name: string, email: string, hashedPassword: string) 
  * @param {string} updatedProperties.password The new password for the user (hashed and salted).
  * @returns {Promise<Object>} Promise object represents the updated user profile.
  */
-const updateUserProfile = (userId: string, updatedProperties: IUpdatedUser) => {
+const updateUserProfile = (userId: string, updatedProperties: IUpdatedUser) : Query<IUser | null, IUser> => {
   return User.findByIdAndUpdate(
     userId, {
     $set: updatedProperties
