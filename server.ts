@@ -65,6 +65,7 @@ const swaggerOptions = {
 }
 
 // TODO: figure out way to auto-generate documentation without using swaggerJSDoc, which was very messy.
+// potentially using TSOA?
 const swaggerSpec = {}
 // const swaggerSpec = swaggerJSDoc(swaggerOptions)
 

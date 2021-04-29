@@ -43,8 +43,7 @@
     "dev": "set NODE_ENV=development&& concurrently \"npm:build:dev\" \"npm:start:dev\"",
     "start:dev": "nodemon ./dist/server.js",
     "start": "set NODE_ENV=production&& node ./dist/server.js",
-    "test": "jest --verbose --silent --runInBand",
-    "test:watch": "jest --watchAll --coverage --verbose --silent --runInBand"
+    "test": "yarn tsc && jest --verbose --silent --runInBand"
   },
   "author": "Michael Peto",
   "jest": {
