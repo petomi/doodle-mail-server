@@ -162,7 +162,7 @@ const getRoomMessages = (roomId: string) => {
  * @param {string} roomId The id of the room to send the message to.
  * @returns {Promise<Object>} Promise object represents the room state after message is sent.
  */
-const sendMessageToRoom = (message: IMessage, userId: string, roomId: string) => {
+const sendMessageToRoom = (message: IMessage, userId: string, roomId: string) : Promise<IRoom | null> => {
   return new Promise(function (resolve, reject) {
     Message.create({
       author: new ObjectId(userId),
@@ -235,7 +235,7 @@ const getUserProfileByEmail = (email: string) => {
  * @param {string} hashedPassword The password of the user being created, hashed and salted.
  * @returns {Promise<Object>} Promise object represents the created user profile.
  */
-const createUserProfile = (name: string, email: string, hashedPassword: string) => {
+const createUserProfile = (name: string, email: string, hashedPassword: string) : Promise<IUser | null> => {
   return new Promise(function (resolve, reject) {
     User.create({
       name: name,
