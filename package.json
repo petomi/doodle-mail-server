@@ -39,6 +39,7 @@
     "mongodb-memory-server": "6.9.6",
     "nodemon": "^2.0.7",
     "supertest": "^6.1.3",
+    "ts-jest": "^26.5.5",
     "typescript": "^4.2.4"
   },
   "scripts": {
@@ -47,8 +48,8 @@
     "dev": "set NODE_ENV=development&& concurrently \"npm:build:dev\" \"npm:start:dev\"",
     "start:dev": "nodemon ./dist/server.js",
     "start": "set NODE_ENV=production&& node ./dist/server.js",
-    "test": "yarn build && jest --verbose --silent --runInBand",
-    "test:watch": "concurrently \"npm:build:dev\" \"jest --watchAll --coverage --verbose --silent --runInBand\""
+    "test": "jest --verbose --silent --runInBand",
+    "test:watch": "jest --watchAll --coverage --verbose --silent --runInBand"
   },
   "author": "Michael Peto",
   "jest": {
