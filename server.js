@@ -9,6 +9,8 @@ const cors = require('cors')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const nanoid = require('nanoid')
+const swaggerJSDoc = require('swagger-jsdoc')
+const swaggerUi = require('swagger-ui-express')
 const dbhelper = require('./dbhelper')
 // const multer = require('multer')
 // const fs = require('fs')
@@ -46,7 +48,35 @@ app.use(cors({
   exposedHeaders: ['origin', 'X-requested-with', 'Content-Type', 'Accept']
 }))
 
-// only connect to mongo and start web server if not a test
+// set up swagger documentation
+const swaggerDefinition = {
+  openapi: '3.0.0',
+  info: {
+    title: 'Doodle Mail API',
+    version: '1.0.0',
+    description: `This is the REST API for Doodle Mail, an application created with Express and MongoDB.
+      It allows users to send pictures they draw on their devices to each other in a chat room environment.`,
+    servers: [{
+        url: 'http://localhost:5000',
+        description: 'Development server'
+      },
+      {
+        url: 'https://doodle-mail-server.herokuapp.com',
+        description: 'Production server'
+      }
+    ]
+  }
+}
+
+const swaggerOptions = {
+  swaggerDefinition,
+  apis: ['./server.js']
+}
+
+const swaggerSpec = swaggerJSDoc(swaggerOptions)
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+
+// connect to mongo and start web server if not a test
 if (process.env.NODE_ENV !== 'test') {
   // connect to Mongo DB instance
   dbhelper.createConnection(process.env.MONGO_URL)
@@ -62,7 +92,7 @@ if (process.env.NODE_ENV !== 'test') {
  */
 const logWithDate = (message, isError) => {
   const currentTime = Date.now()
-  if(isError) {
+  if (isError) {
     console.error(`${currentTime}: ${message}`)
   } else {
     console.log(`${currentTime}: ${message}`)
@@ -74,8 +104,23 @@ const logWithDate = (message, isError) => {
  * API Routes
  */
 // TODO - create Express API endpoint documentation from comments (automated?) - use swagger-ui and swagger-jsdoc
+// TODO - fix failing automated tests on github (process.env variables are undefined)
+// TODO - split out server configuration or routes into their own modules
 
-// home/test page
+/**
+ * @swagger
+ * /:
+ *  get:
+ *    summary: Retrieve a simple test message from the server.
+ *    responses:
+ *      200:
+ *        description: A test message.
+ *        content:
+ *          text/plain:
+ *            schema:
+ *              type: string
+ *              example: Welcome to doodle-mail!
+ */
 app.get('/', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
   logWithDate(`@GET /`)
@@ -83,7 +128,34 @@ app.get('/', function (req, res) {
 })
 
 /**
- * Get all room basic info (only accessible in dev environment)
+ * @swagger
+ * /rooms/info:
+ *  get:
+ *    summary: View info for all rooms.
+ *    description: View basic info for all rooms, not including message or user details. Only accessible in dev environment.
+ *    responses:
+ *      200:
+ *        description: An array of room objects.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: string
+ *              example:
+ *                {
+ *                  "rooms": [
+ *                      {
+ *                          "participants": [
+ *                              "6083303610cd25158809b909"
+ *                          ],
+ *                          "messages": [
+ *                              "608330e010cd25158809b90c"
+ *                          ],
+ *                          "_id": "6083307c10cd25158809b90b",
+ *                          "entryCode": "cBSL",
+ *                          "__v": 0
+ *                      }
+ *                   ]
+ *                 }
  */
 app.get('/rooms/info', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
@@ -101,7 +173,59 @@ app.get('/rooms/info', function (req, res) {
 })
 
 /**
- * Get specific room info, including messages
+ * @swagger
+ * /rooms/:roomCode/info:
+ *  get:
+ *    summary: View info for a specific room.
+ *    description: View info for a specific room, including user names and message details.
+ *    parameters:
+ *      - in: path
+ *        name: roomCode
+ *        required: true
+ *        description: The 4 character alpha code that identifies rooms to a user.
+ *        schema:
+ *          type: string
+ *    responses:
+ *      200:
+ *        description: A room object.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: string
+ *              example:
+ *                {
+ *                  "room": {
+ *                    "participants": [
+ *                      {
+ *                        "_id": "6083303610cd25158809b909",
+ *                          "name": "Michael Test",
+ *                          "__v": 0
+ *                      }
+ *                    ],
+ *                    "messages": [
+ *                      {
+ *                        "_id": "60870957094e2509b8671159",
+ *                        "author": {
+ *                            "_id": "6083303610cd25158809b909",
+ *                            "name": "Michael Test",
+ *                            "email": "test@test.com",
+ *                            "password": "$2b$08$qbfD8ygxyDr0WKIQ1VSyueRNrjgy0upLq1RsYR.8/0tgTCcAbfIoC",
+ *                            "__v": 0
+ *                        },
+ *                        "title": "Test Message 4",
+ *                        "date": "1619462487946",
+ *                        "imageData": "TALKJLASJD",
+ *                        "background": "blue",
+ *                        "__v": 0
+ *                      }
+ *                    ],
+ *                    "_id": "6086f4f3c251c729b4a041a6",
+ *                    "entryCode": "abcd",
+ *                    "__v": 0
+ *                  }
+ *                }
+ *      400:
+ *       description: Bad request. Missing room code in URL or internal error.
  */
 app.get('/rooms/:roomCode/info', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')
@@ -126,7 +250,38 @@ app.get('/rooms/:roomCode/info', function (req, res) {
 })
 
 /**
- * Create a new room
+ * @swagger
+ * /rooms:
+ *  post:
+ *    summary: Create a new room.
+ *    description: Create a new room and add the specified user to it, then return the room details.
+ *    parameters:
+ *      - in: body
+ *        name: userId
+ *        description: The user id of the user to add to the newly created room.
+ *        schema:
+ *          type: string
+ *    responses:
+ *      200:
+ *        description: A room object.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: string
+ *              example:
+ *                {
+ *                  "room": {
+ *                    "participants": [
+ *                      "6083303610cd25158809b909"
+ *                    ],
+ *                    "messages": [],
+ *                    "_id": "608ac3a16774c31aa8c8082b",
+ *                    "entryCode": "kQ0g",
+ *                    "__v": 0
+ *                  }
+ *                }
+ *      400:
+ *        description: Bad Request. Missing userId in request body or other error.
  */
 app.post('/rooms', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
@@ -155,8 +310,50 @@ app.post('/rooms', function (req, res) {
 
 
 /**
- * Join room using access code
+ * @swagger
+ * /rooms/:roomCode/join:
+ *  post:
+ *    summary: Join a room by room code.
+ *    description: Add user to a room selected by room code, then return the room.
+ *    parameters:
+ *      - in: path
+ *        name: roomCode
+ *        required: true
+ *        description: The 4 character alpha code that identifies rooms to a user.
+ *        schema:
+ *          type: string
+ *      - in: body
+ *        name: userId
+ *        description: The user id of the user to add to the newly created room.
+ *        schema:
+ *          type: string
+ *    responses:
+ *      200:
+ *        description: A room object.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: string
+ *              example:
+ *                {
+ *                  "room": {
+ *                      "participants": [
+ *                        {
+ *                          "_id": "6083303610cd25158809b909",
+ *                          "name": "Michael Test",
+ *                          "__v": 0
+ *                        }
+ *                      ],
+ *                      "messages": [],
+ *                      "_id": "6086f4f3c251c729b4a041a6",
+ *                      "entryCode": "vnOk",
+ *                      "__v": 0
+ *                  }
+ *                }
+ *      400:
+ *        description: Bad Request. Missing roomCode in URL params or userId in request body, or user already exists in room.
  */
+// TODO: check if user is already in room before you add them
 app.post('/rooms/:roomCode/join', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
@@ -177,14 +374,35 @@ app.post('/rooms/:roomCode/join', function (req, res) {
       })
     })
   } else {
-    logWithDate(`Missing roomCode in URL params or user Id in request body`)
+    logWithDate(`Missing roomCode in URL params or userId in request body`)
     // throw error if data is incomplete.
     return res.status(400).send()
   }
 })
 
 /**
- * Leave a room by access code
+ * @swagger
+ * /rooms/:roomCode/leave:
+ *  post:
+ *    summary: Leave a room by room code.
+ *    parameters:
+ *      - in: path
+ *        name: roomCode
+ *        required: true
+ *        description: The 4 character alpha code that identifies rooms to a user.
+ *        schema:
+ *          type: string
+ *      - in: body
+ *        name: userId
+ *        description: The user id of the user to add to the newly created room.
+ *        schema:
+ *          type: string
+ *    description: Remove user from room selected by room code.
+ *    responses:
+ *      200:
+ *        description: An OK response.
+ *      400:
+ *        description: Bad Request. Missing roomCode in URL parameters or userId in request body, or user does not exist in room.
  */
 app.post('/rooms/:roomCode/leave', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'POST')
@@ -203,14 +421,55 @@ app.post('/rooms/:roomCode/leave', function (req, res) {
       })
     })
   } else {
-    logWithDate(`Missing room code in URL parameters or userId in request body`)
+    logWithDate(`Missing roomCode in URL parameters or userId in request body`)
     // throw error if data is incomplete
     return res.status(400).send()
   }
 })
 
 /**
- * Pull all messages for the room by room id (not room code!)
+ * @swagger
+ * /rooms/:roomId/messages:
+ *   get:
+ *     summary: Gets all messages for the room by roomId
+ *     parameters:
+ *       - in: path
+ *         name: roomCode
+ *         required: true
+ *         description: The 4 character alpha code that identifies rooms to a user.
+ *         schema:
+ *           type: string
+ *       - in: body
+ *         name: userId
+ *         description: The user id of the user to add to the newly created room.
+ *         schema:
+ *           type: string
+ *     description: Gets all messages for the room by roomId, including all message and author details.
+ *     responses:
+ *       200:
+ *         description: An array of message objects.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: string
+ *               example:
+ *                 [
+ *                   {
+ *                       "_id": "60870957094e2509b8671159",
+ *                       "author": {
+ *                           "_id": "6083303610cd25158809b909",
+ *                           "name": "Michael Test",
+ *                           "__v": 0
+ *                       },
+ *                       "title": "Test Message 4",
+ *                       "date": "1619462487946",
+ *                       "imageData": "TALKJLASJD",
+ *                       "background": "blue",
+ *                       "__v": 0
+ *                   }
+ *                 ]
+ *       400:
+ *         description: Bad Request. Missing roomId in URL params or userId in request body, or user already exists in room.
  */
 app.get('/rooms/:roomId/messages', function (req, res) {
   res.header('Access-Control-Allow-Methods', 'GET')

@@ -18,8 +18,6 @@ const createConnection = (mongoHost) => {
   })
   // if connection is successful, create DB and initialize server
   var db = mongoose.connection
-  console.log('Database connection ready.')
-  console.log(process.env.MONGO_URL) // TODO: remove this, just for debug!
   // bind connection on error event
   db.on('error', console.error.bind(console, 'MongoDB connection error:'))
 }
