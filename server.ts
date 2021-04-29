@@ -13,6 +13,7 @@ import nanoid from 'nanoid'
 import swaggerJSDoc from 'swagger-jsdoc'
 import swaggerUi from 'swagger-ui-express'
 import dbhelper from './dbhelper'
+import { IMessageData } from "./models/message-data"
 // const multer = require('multer')
 // const fs = require('fs')
 
@@ -462,7 +463,7 @@ app.post('/rooms/:roomCode/leave', function (req: express.Request, res: express.
  *                   }
  *                 ]
  *       400:
- *         description: Bad Request. Missing roomId in URL params or userId in request body, or user already exists in room.
+ *         description: Bad Request. Missing roomId in URL params or userId in request body, or user is not part of room.
  */
 app.get('/rooms/:roomId/messages', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'GET')
@@ -488,6 +489,65 @@ app.get('/rooms/:roomId/messages', function (req: express.Request, res: express.
 })
 
 /**
+ * @swagger
+ * /rooms/:roomId/messages:
+ *   post:
+ *     summary: Write a message to a room by roomId.
+ *     description: Sends a message from the designated user to the room by roomId.
+ *     parameters:
+ *       - in: path
+ *         name: roomId
+ *         required: true
+ *         description: The roomId (not the 4 digit alpha code).
+ *         schema:
+ *           type: string
+ *       - in: body
+ *         name: userId
+ *         description: The user id of the user sending the message..
+ *         schema:
+ *           type: string
+ *       - in: body
+ *         name: messages
+ *         description: An array of message objects to send to the room.
+ *         schema:
+ *           type: array
+ *           properties:
+ *             title:
+ *               type: string
+ *               description: The title of the message.
+ *             imageData:
+ *               type: string
+ *               description: The image data in the message, encoded to base64.
+ *             background:
+ *               type: string
+ *               description: The name of the color to be used as a background for the image.
+ *     responses:
+ *       200:
+ *         description: An array containing the room's messages, after adding the newly created message.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: string
+ *               example:
+ *                 [
+ *                   {
+ *                       "_id": "60870957094e2509b8671159",
+ *                       "author": {
+ *                           "_id": "6083303610cd25158809b909",
+ *                           "name": "Michael Test",
+ *                           "__v": 0
+ *                       },
+ *                       "title": "Test Message 4",
+ *                       "date": "1619462487946",
+ *                       "imageData": "TALKJLASJD",
+ *                       "background": "blue",
+ *                       "__v": 0
+ *                   }
+ *                 ]
+ *       400:
+ *         description: Bad Request. Missing roomId in URL params or userId or message details in request body, or user is not in room.
+ */
+/**
  * Write a message to a room by room id.
  * Returns list of room messages.
  * Requires fields: user, message: { title, imageData, background }
@@ -500,7 +560,7 @@ app.post('/rooms/:roomId/messages', function (req: express.Request, res: express
   if (req.params.roomId != null && req.body.userId != null && req.body.messages != null) {
     logWithDate(`Sending message from user ${req.body.userId} to room ${req.params.roomId}`)
     // create message, then add it to a room
-    const messageWrites = req.body.messages.map((message: IMessage) => {
+    const messageWrites = req.body.messages.map((message: IMessageData) => {
       return new Promise<void>((resolve, reject) => {
         // insert each message into DB collection
         dbhelper.sendMessageToRoom(message, req.body.userId, req.params.roomId)
@@ -538,7 +598,68 @@ app.post('/rooms/:roomId/messages', function (req: express.Request, res: express
 })
 
 /**
- * Delete a message by message id
+ * @swagger
+ * /rooms/:roomId/messages:
+ *   post:
+ *     summary: Write a message to a room by roomId.
+ *     description: Sends a message from the designated user to the room by roomId.
+ *     parameters:
+ *       - in: path
+ *         name: roomId
+ *         required: true
+ *         description: The roomId (not the 4 digit alpha code).
+ *         schema:
+ *           type: string
+ *       - in: body
+ *         name: userId
+ *         description: The user id of the user sending the message..
+ *         schema:
+ *           type: string
+ *       - in: body
+ *         name: messages
+ *         description: An array of message objects to send to the room.
+ *         schema:
+ *           type: array
+ *           properties:
+ *             title:
+ *               type: string
+ *               description: The title of the message.
+ *             imageData:
+ *               type: string
+ *               description: The image data in the message, encoded to base64.
+ *             background:
+ *               type: string
+ *               description: The name of the color to be used as a background for the image.
+ *     responses:
+ *       200:
+ *         description: An array containing the room's messages, after adding the newly created message.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: string
+ *               example:
+ *                 [
+ *                   {
+ *                       "_id": "60870957094e2509b8671159",
+ *                       "author": {
+ *                           "_id": "6083303610cd25158809b909",
+ *                           "name": "Michael Test",
+ *                           "__v": 0
+ *                       },
+ *                       "title": "Test Message 4",
+ *                       "date": "1619462487946",
+ *                       "imageData": "TALKJLASJD",
+ *                       "background": "blue",
+ *                       "__v": 0
+ *                   }
+ *                 ]
+ *       400:
+ *         description: Bad Request. Missing roomId in URL params or userId or message details in request body, or user is not in room.
+ */
+/**
+ * Write a message to a room by room id.
+ * Returns list of room messages.
+ * Requires fields: user, message: { title, imageData, background }
  */
 app.delete('/messages', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'DELETE')
