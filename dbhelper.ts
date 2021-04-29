@@ -1,22 +1,22 @@
-import { IMessage } from "./models/message"
-import { IRoom } from "./models/room"
-import { IUser } from "./models/user"
-
-const mongoose = require('mongoose')
+import Message, { IMessage } from "./models/message"
+import Room, { IRoom } from "./models/room"
+import User, { IUser } from "./models/user"
+import mongoose from 'mongoose'
+import { IUpdatedUser } from "./models/updated-user"
 const ObjectId = mongoose.Types.ObjectId
 
 
 /**
  * Creates a Mongo DB connection instance.
  */
-const createConnection = (mongoHost: any) => {
+const createConnection = (mongoHost: string) : void => {
   mongoose.set('useFindAndModify', false)
   mongoose.connect(mongoHost || 'mongodb://localhosts:27017/test', {
     useNewUrlParser: true,
     useUnifiedTopology: true
   })
   // if connection is successful, create DB and initialize server
-  var db = mongoose.connection
+  const db = mongoose.connection
   // bind connection on error event
   db.on('error', console.error.bind(console, 'MongoDB connection error:'))
 }
@@ -24,7 +24,7 @@ const createConnection = (mongoHost: any) => {
 /**
  * Closes the Mongo DB connection.
  */
-const closeConnection = () => {
+const closeConnection = () : void => {
   mongoose.disconnect()
 }
 
@@ -117,9 +117,9 @@ const leaveRoom = (userId: string, roomCode: string) => {
       }
     }, {
       new: true // get result after performing the update.
-    }).then((room: IRoom) => {
+    }).then((room: IRoom | null) => {
       // if room is empty, delete room
-      if (room.participants.length === 0) {
+      if (room != null && room.participants.length === 0) {
         Room.deleteOne({
           _id: room._id
         }).then(() => {
@@ -162,7 +162,7 @@ const getRoomMessages = (roomId: string) => {
  * @param {string} roomId The id of the room to send the message to.
  * @returns {Promise<Object>} Promise object represents the room state after message is sent.
  */
-const sendMessageToRoom = (message: any, userId: string, roomId: string) => {
+const sendMessageToRoom = (message: IMessage, userId: string, roomId: string) => {
   return new Promise(function (resolve, reject) {
     Message.create({
       author: new ObjectId(userId),
@@ -186,7 +186,7 @@ const sendMessageToRoom = (message: any, userId: string, roomId: string) => {
             path: 'author',
             select: '-email -password'
           }
-        }).then((room: IRoom) => {
+        }).then((room: IRoom | null) => {
           resolve(room)
         })
       }).catch((err: Error) => {
@@ -246,7 +246,7 @@ const createUserProfile = (name: string, email: string, hashedPassword: string) 
       // log in user with token
       User.findOne({
         email: email
-      }).then((user: IUser) => {
+      }).then((user: IUser | null) => {
         resolve(user)
       }).catch((err: Error) => {
         console.log(`Error finding new user: ${err}`)
@@ -268,7 +268,7 @@ const createUserProfile = (name: string, email: string, hashedPassword: string) 
  * @param {string} updatedProperties.password The new password for the user (hashed and salted).
  * @returns {Promise<Object>} Promise object represents the updated user profile.
  */
-const updateUserProfile = (userId: string, updatedProperties: any) => {
+const updateUserProfile = (userId: string, updatedProperties: IUpdatedUser) => {
   return User.findByIdAndUpdate(
     userId, {
     $set: updatedProperties
@@ -278,7 +278,7 @@ const updateUserProfile = (userId: string, updatedProperties: any) => {
   )
 }
 
-module.exports = {
+export default {
   createConnection,
   closeConnection,
   getAllRoomInfo,

@@ -2,27 +2,27 @@ import { IMessage } from "./models/message"
 import { IRoom } from "./models/room"
 import { IUpdatedUser } from "./models/updated-user"
 import { IUser } from "./models/user"
-
-// Setup
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config()
-}
-const express = require('express')
-const path = require('path')
-const bodyParser = require('body-parser')
-const cors = require('cors')
-const bcrypt = require('bcrypt')
-const jwt = require('jsonwebtoken')
-const nanoid = require('nanoid')
-const swaggerJSDoc = require('swagger-jsdoc')
-const swaggerUi = require('swagger-ui-express')
-const dbhelper = require('./dbhelper')
+import dotenv from 'dotenv'
+import express from 'express'
+import path from 'path'
+import bodyParser from 'body-parser'
+import cors from 'cors'
+import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+import nanoid from 'nanoid'
+import swaggerJSDoc from 'swagger-jsdoc'
+import swaggerUi from 'swagger-ui-express'
+import dbhelper from './dbhelper'
 // const multer = require('multer')
 // const fs = require('fs')
 
 /**
  * Configure Express Server
  */
+
+ if (process.env.NODE_ENV !== 'production') {
+  dotenv.config()
+}
 const app = express()
 const staticFileMiddleware = express.static(path.resolve(__dirname) + '/dist')
 app.use(staticFileMiddleware)
@@ -32,25 +32,14 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json())
 
 // CORS setup
-var allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(' ') : '*'
-app.use(cors({
-  origin: function (origin: string, callback: (error: any, bool: boolean) => any) {
-    if (process.env.NODE_ENV !== 'production') {
-      // allow requests with no origin
-      // (like mobile apps or curl requests)
-      if (!origin) return callback(null, true)
-    } else {
-      if (allowedOrigins.indexOf(origin) === -1) {
-        var msg = 'The CORS policy for this site does not ' +
-          'allow access from the specified Origin.'
-        return callback(new Error(msg), false)
-      }
-    }
-    return callback(null, true)
-  },
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(' ') : '*'
+const corsOptions: cors.CorsOptions = {
+  origin: allowedOrigins,
   credentials: true,
   exposedHeaders: ['origin', 'X-requested-with', 'Content-Type', 'Accept']
-}))
+}
+
+app.use(cors(corsOptions))
 
 // set up swagger documentation
 const swaggerDefinition = {
@@ -83,10 +72,10 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 // connect to mongo and start web server if not a test
 if (process.env.NODE_ENV !== 'test') {
   // connect to Mongo DB instance
-  dbhelper.createConnection(process.env.MONGO_URL)
+  dbhelper.createConnection(process.env.MONGO_URL || '')
 
   // start server
-  var port = process.env.PORT || 5000
+  const port = process.env.PORT || 5000
   app.listen(port)
   console.log('server started on port: ' + port)
 }
@@ -125,7 +114,7 @@ const logWithDate = (message: string, isError?: boolean) => {
  *              type: string
  *              example: Welcome to doodle-mail!
  */
-app.get('/', function (req: any, res: any) {
+app.get('/', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'GET')
   logWithDate(`@GET /`)
   return res.status(200).send('Welcome to doodle-mail!')
@@ -161,7 +150,7 @@ app.get('/', function (req: any, res: any) {
  *                   ]
  *                 }
  */
-app.get('/rooms/info', function (req: any, res: any) {
+app.get('/rooms/info', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'GET')
   logWithDate(`@GET /rooms/info`)
   if (process.env.NODE_ENV !== 'production') {
@@ -231,13 +220,13 @@ app.get('/rooms/info', function (req: any, res: any) {
  *      400:
  *       description: Bad request. Missing room code in URL or internal error.
  */
-app.get('/rooms/:roomCode/info', function (req: any, res: any) {
+app.get('/rooms/:roomCode/info', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'GET')
   res.header('Content-Type', 'application/json')
   logWithDate(`@GET /rooms/${req.params.roomCode}/info`)
   if (req.params.roomCode != null) {
     logWithDate(`Finding room: ${req.params.roomCode}`)
-    dbhelper.getRoomInfo(req.params.roomCode).then((room: IRoom) => {
+    dbhelper.getRoomInfo(req.params.roomCode).then((room: IRoom | null) => {
       return res.status(200).send({
         room: room
       })
@@ -287,7 +276,7 @@ app.get('/rooms/:roomCode/info', function (req: any, res: any) {
  *      400:
  *        description: Bad Request. Missing userId in request body or other error.
  */
-app.post('/rooms', function (req: any, res: any) {
+app.post('/rooms', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   logWithDate(`@POST /rooms`)
@@ -358,7 +347,7 @@ app.post('/rooms', function (req: any, res: any) {
  *        description: Bad Request. Missing roomCode in URL params or userId in request body, or user already exists in room.
  */
 // TODO: check if user is already in room before you add them
-app.post('/rooms/:roomCode/join', function (req: any, res: any) {
+app.post('/rooms/:roomCode/join', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   logWithDate(`@POST /rooms/${req.params.roomCode}/join`)
@@ -366,7 +355,7 @@ app.post('/rooms/:roomCode/join', function (req: any, res: any) {
   if (req.params.roomCode != null && req.body.userId != null) {
     logWithDate(`User ${req.body.userId} attempting to join room with code ${req.params.roomCode}`)
     // find room by roomCode, add user to it, and populate the array of users in room
-    dbhelper.joinRoom(req.body.userId, req.params.roomCode).then((room: IRoom) => {
+    dbhelper.joinRoom(req.body.userId, req.params.roomCode).then((room: IRoom | null) => {
       // return data for room
       return res.status(200).send({
         room: room
@@ -408,7 +397,7 @@ app.post('/rooms/:roomCode/join', function (req: any, res: any) {
  *      400:
  *        description: Bad Request. Missing roomCode in URL parameters or userId in request body, or user does not exist in room.
  */
-app.post('/rooms/:roomCode/leave', function (req: any, res: any) {
+app.post('/rooms/:roomCode/leave', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   logWithDate(`@POST /rooms/${req.params.roomCode}/leave`)
@@ -475,13 +464,13 @@ app.post('/rooms/:roomCode/leave', function (req: any, res: any) {
  *       400:
  *         description: Bad Request. Missing roomId in URL params or userId in request body, or user already exists in room.
  */
-app.get('/rooms/:roomId/messages', function (req: any, res: any) {
+app.get('/rooms/:roomId/messages', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'GET')
   res.header('Content-Type', 'application/json')
   logWithDate(`@GET /rooms/${req.params.roomId}/messages`)
   // get messages for a room by id
-  dbhelper.getRoomMessages(req.params.roomId).then((room: IRoom) => {
-    if (room.participants.includes(req.body.userId)) {
+  dbhelper.getRoomMessages(req.params.roomId).then((room: IRoom | null) => {
+    if (room != null && room.participants.includes(req.body.userId)) {
       logWithDate(`Getting messages for room ${req.params.roomId} for user ${req.body.userId}`)
       return res.status(200).send(room.messages)
     } else {
@@ -503,7 +492,7 @@ app.get('/rooms/:roomId/messages', function (req: any, res: any) {
  * Returns list of room messages.
  * Requires fields: user, message: { title, imageData, background }
  */
-app.post('/rooms/:roomId/messages', function (req: any, res: any) {
+app.post('/rooms/:roomId/messages', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   logWithDate(`@POST /rooms/${req.params.roomId}/messages`)
@@ -511,11 +500,11 @@ app.post('/rooms/:roomId/messages', function (req: any, res: any) {
   if (req.params.roomId != null && req.body.userId != null && req.body.messages != null) {
     logWithDate(`Sending message from user ${req.body.userId} to room ${req.params.roomId}`)
     // create message, then add it to a room
-    let messageWrites = req.body.messages.map((message: IMessage) => {
+    const messageWrites = req.body.messages.map((message: IMessage) => {
       return new Promise<void>((resolve, reject) => {
         // insert each message into DB collection
         dbhelper.sendMessageToRoom(message, req.body.userId, req.params.roomId)
-          .then((room: IRoom) => {
+          .then((room: IRoom | null) => {
             result = room
             resolve()
           })
@@ -551,7 +540,7 @@ app.post('/rooms/:roomId/messages', function (req: any, res: any) {
 /**
  * Delete a message by message id
  */
-app.delete('/messages', function (req: any, res: any) {
+app.delete('/messages', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'DELETE')
   res.header('Content-Type', 'application/json')
   logWithDate(`@DELETE /messages`)
@@ -576,12 +565,12 @@ app.delete('/messages', function (req: any, res: any) {
 /**
  * Return all user profile info
  */
-app.get('/users/:userId', function (req: any, res: any) {
+app.get('/users/:userId', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'GET')
   res.header('Content-Type', 'application/json')
   logWithDate(`@GET /users/${req.params.userId}`)
   dbhelper.getUserProfileById(req.params.userId)
-    .then((user: IUser) => {
+    .then((user: IUser | null) => {
       logWithDate(`Retrieved data for user ${req.params.userId}`)
       return res.status(200).json({
         user: user
@@ -598,7 +587,7 @@ app.get('/users/:userId', function (req: any, res: any) {
  * Create a new user account
  * Takes in an object containing name, email, and password fields
  */
-app.post('/users', function (req: any, res: any) {
+app.post('/users', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   logWithDate(`@POST /users`)
@@ -606,7 +595,7 @@ app.post('/users', function (req: any, res: any) {
     logWithDate(`Checking for existing account with email: ${req.body.email}`)
     // check if email is already in use
     dbhelper.getUserProfileByEmail(req.body.email)
-      .then((user: IUser) => {
+      .then((user: IUser | null) => {
         // if there is a user, do not create account
         if (user != null) {
           logWithDate(`Duplicate email found. Account not created.`)
@@ -618,11 +607,14 @@ app.post('/users', function (req: any, res: any) {
         // create new user
         bcrypt.hash(req.body.password, 8).then((hashedPassword: string) => {
           dbhelper.createUserProfile(req.body.name, req.body.email, hashedPassword)
-            .then((user: IUser) => {
+            .then((user: IUser | null) => {
+              if (user === null) {
+                throw new Error(`User is null.`)
+              }
               logWithDate(`Creating login token for newly created user`)
-              let token = jwt.sign({
+              const token = jwt.sign({
                 id: user._id
-              }, process.env.TOKEN_SECRET, {
+              }, process.env.TOKEN_SECRET || '1234', {
                 expiresIn: 86400 // expires in 24 hours
               })
               logWithDate(`Token created. User logged in.`)
@@ -658,13 +650,13 @@ app.post('/users', function (req: any, res: any) {
  * Log user in and provide with auth token
  * Takes in object with email and password
  */
-app.post('/users/login', function (req: any, res: any) {
+app.post('/users/login', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
   logWithDate(`@/users/login`)
   if (req.body.email != null && req.body.password != null) {
     logWithDate(`Getting user profile by email ${req.body.email}`)
-    dbhelper.getUserProfileByEmail(req.body.email).then((user: IUser) => {
+    dbhelper.getUserProfileByEmail(req.body.email).then((user: IUser | null) => {
       if (!user) {
         logWithDate(`No user found with that email`)
         return res.status(401).send({
@@ -682,9 +674,9 @@ app.post('/users/login', function (req: any, res: any) {
           })
         }
         logWithDate(`Login info valid, generating token`)
-        let token = jwt.sign({
+        const token = jwt.sign({
           id: user._id
-        }, process.env.TOKEN_SECRET, {
+        }, process.env.TOKEN_SECRET || '1234', {
           expiresIn: 86400 // expires in 24 hours
         })
         logWithDate(`Token generated successfully and user logged in`)
@@ -717,7 +709,7 @@ app.post('/users/login', function (req: any, res: any) {
  */
 // TODO: add photo upload using mongoose + multer
 // update user account details (as many as are passed in)
-app.put('/users', function (req: any, res: any) {
+app.put('/users', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'PUT')
   res.header('Content-Type', 'application/json')
   logWithDate(`@PUT /users`)
@@ -726,7 +718,7 @@ app.put('/users', function (req: any, res: any) {
     // check if email is already in use
     logWithDate(`Checking if email ${req.body.updatedProperties.email} is already in use`)
     dbhelper.getUserProfileByEmail(req.body.email)
-      .then((user: IUser) => {
+      .then((user: IUser | null) => {
         // if there is a user, do not create account
         if (user != null) {
           logWithDate(`Duplicate email found`)
@@ -735,7 +727,7 @@ app.put('/users', function (req: any, res: any) {
           })
         }
         // check new values for null, only include if not null
-        let updated: IUpdatedUser = {}
+        const updated: IUpdatedUser = {}
         if (req.body.updatedProperties.name) updated.name = req.body.updatedProperties.name
         if (req.body.updatedProperties.email) updated.email = req.body.updatedProperties.email
 
@@ -747,7 +739,7 @@ app.put('/users', function (req: any, res: any) {
               updated.password = hashedPassword
               // get user belonging to that context GUID and update their properties
               dbhelper.updateUserProfile(req.body.userId, updated)
-                .then((user: IUser) => {
+                .then((user: IUser | null) => {
                   logWithDate(`User profile updated successfully`)
                   return res.status(200).send({
                     user: user
@@ -767,7 +759,7 @@ app.put('/users', function (req: any, res: any) {
         } else {
           // get user belonging to that context GUID and update their properties
           dbhelper.updateUserProfile(req.body.userId, updated)
-            .then((user: IUser) => {
+            .then((user: IUser | null) => {
               logWithDate(`User profile updated successfully`)
               return res.status(200).send({
                 user: user
@@ -787,7 +779,7 @@ app.put('/users', function (req: any, res: any) {
 })
 
 // // upload avatar
-// app.post('/uploadAvatar', upload.single('picture'), (req: any, res: any) => {
+// app.post('/uploadAvatar', upload.single('picture'), (req: express.Request, res: express.Response) => {
 //   var img = fs.readFileSynce(req.file.path)
 //   var encode_image = img.toString('base64')
 //   var finalimg = {
