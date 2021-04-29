@@ -11,7 +11,7 @@ const ObjectId = mongoose.Types.ObjectId
  */
 const createConnection = (mongoHost: string) : void => {
   mongoose.set('useFindAndModify', false)
-  mongoose.connect(mongoHost || 'mongodb://localhosts:27017/test', {
+  mongoose.connect(mongoHost, {
     useNewUrlParser: true,
     useUnifiedTopology: true
   })

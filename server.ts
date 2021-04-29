@@ -19,8 +19,7 @@ import dbhelper from './dbhelper'
 /**
  * Configure Express Server
  */
-
- if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production') {
   dotenv.config()
 }
 const app = express()
@@ -72,7 +71,8 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 // connect to mongo and start web server if not a test
 if (process.env.NODE_ENV !== 'test') {
   // connect to Mongo DB instance
-  dbhelper.createConnection(process.env.MONGO_URL || '')
+  const connectionString: string = process.env.MONGO_URL || ''
+  dbhelper.createConnection(connectionString)
 
   // start server
   const port = process.env.PORT || 5000
