@@ -42,7 +42,7 @@
     "start:dev": "nodemon dist/index.js",
     "start": "set NODE_ENV=production&& node .",
     "test": "yarn build && jest --verbose --silent --runInBand",
-    "test:watch": "concurrently \"npm:build:dev\" \"jest --watchAll --coverage --verbose --silent --runInBand\"",
+    "test:watch": "concurrently \"npm:build:dev\" \"jest --watchAll --coverage --verbose --silent --runInBand\""
   },
   "author": "Michael Peto",
   "jest": {
