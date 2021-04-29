@@ -1,3 +1,7 @@
+import { IMessage } from "../models/message";
+import { IRoom } from "../models/room";
+import { IUser } from "../models/user";
+
 const mongoose = require('mongoose');
 const {
   MongoMemoryServer
@@ -25,7 +29,7 @@ const connect = async () => {
 
   const mongoUri = await mongoServer.getUri();
   mongoose.set('useFindAndModify', false)
-  await mongoose.connect(mongoUri, opts, err => {
+  await mongoose.connect(mongoUri, opts, (err: any) => {
     if (err) {
       console.error(err);
     }
@@ -48,23 +52,23 @@ const clear = async () => {
 };
 
 const seed = () => {
-  return new Promise(function (resolve) {
+  return new Promise<void>(function (resolve) {
     User.create([{
-        name: 'Jim Test',
-        email: 'test@test.com',
-        password: '$2b$08$KLu9La4ucbj.aKDBnS/9d.TnsrrEp.yyQHcuJZFkNrCFt0MQEAgK2'
-      },
-      {
-        name: 'Bob Test',
-        email: 'test2@test.com',
-        password: '$2b$08$ZCNcsq1agfLQvV3Von21nu9po452CsgFDD1ccQLBBTGhIAziQXVJO'
-      },
-      {
-        name: 'Tracy Test',
-        email: 'test3@test.com',
-        password: '$2b$08$KLu9La4ucbj.aKDBnS/9d.TnsrrEp.yyQHcuJZFkNrCFt0MQEAgK2'
-      }
-    ]).then((users) => {
+      name: 'Jim Test',
+      email: 'test@test.com',
+      password: '$2b$08$KLu9La4ucbj.aKDBnS/9d.TnsrrEp.yyQHcuJZFkNrCFt0MQEAgK2'
+    },
+    {
+      name: 'Bob Test',
+      email: 'test2@test.com',
+      password: '$2b$08$ZCNcsq1agfLQvV3Von21nu9po452CsgFDD1ccQLBBTGhIAziQXVJO'
+    },
+    {
+      name: 'Tracy Test',
+      email: 'test3@test.com',
+      password: '$2b$08$KLu9La4ucbj.aKDBnS/9d.TnsrrEp.yyQHcuJZFkNrCFt0MQEAgK2'
+    }
+    ]).then((users: Array<IUser>) => {
       Room.create({
         entryCode: 'ABCD',
         participants: [
@@ -72,24 +76,24 @@ const seed = () => {
           new ObjectId(users[1]._id)
         ],
         messages: []
-      }).then((room) => {
+      }).then((room: IRoom) => {
         Message.create([{
-            author: new ObjectId(users[0]._id),
-            room: new ObjectId(room._id),
-            title: 'Test Message 1',
-            date: Date.now(),
-            imageData: 'testimagedata',
-            background: 'white'
-          },
-          {
-            author: new ObjectId(users[1]._id),
-            room: new ObjectId(room._id),
-            title: 'Test Message 2',
-            date: Date.now(),
-            imageData: 'testimagedata',
-            background: 'white'
-          }
-        ]).then((messages) => {
+          author: new ObjectId(users[0]._id),
+          room: new ObjectId(room._id),
+          title: 'Test Message 1',
+          date: Date.now(),
+          imageData: 'testimagedata',
+          background: 'white'
+        },
+        {
+          author: new ObjectId(users[1]._id),
+          room: new ObjectId(room._id),
+          title: 'Test Message 2',
+          date: Date.now(),
+          imageData: 'testimagedata',
+          background: 'white'
+        }
+        ]).then((messages: Array<IMessage>) => {
           messages.forEach((message) => {
             Room.findByIdAndUpdate(room._id, {
               $push: {

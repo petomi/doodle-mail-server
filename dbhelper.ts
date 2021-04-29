@@ -1,16 +1,15 @@
+import { IMessage } from "./models/message"
+import { IRoom } from "./models/room"
+import { IUser } from "./models/user"
+
 const mongoose = require('mongoose')
-const {
-  User,
-  Message,
-  Room
-} = require('./models/schema.js')
 const ObjectId = mongoose.Types.ObjectId
 
 
 /**
  * Creates a Mongo DB connection instance.
  */
-const createConnection = (mongoHost) => {
+const createConnection = (mongoHost: any) => {
   mongoose.set('useFindAndModify', false)
   mongoose.connect(mongoHost || 'mongodb://localhosts:27017/test', {
     useNewUrlParser: true,
@@ -42,7 +41,7 @@ const getAllRoomInfo = () => {
  * @param {string} roomCode The 4 digit code used to join the room.
  * @returns {Promise<Object>} Promise object represents the room info.
  */
-const getRoomInfo = (roomCode) => {
+const getRoomInfo = (roomCode: string) => {
   return Room.findOne({
     entryCode: roomCode
   }).populate({
@@ -64,7 +63,7 @@ const getRoomInfo = (roomCode) => {
  * @param {string} roomCode The 4 digit code used to join the room.
  * @returns {Promise<Object>} Promise object represents the created room info.
  */
-const createRoom = (userId, roomCode) => {
+const createRoom = (userId: string, roomCode: string) => {
   return Room.create({
     entryCode: roomCode,
     participants: [userId],
@@ -79,7 +78,7 @@ const createRoom = (userId, roomCode) => {
  * @returns {Promise<Object>} Promise object represents the room after joining.
  * @todo TODO: check whether user is already part of room before adding them
  */
-const joinRoom = (userId, roomCode) => {
+const joinRoom = (userId: string, roomCode: string) => {
   return Room.findOneAndUpdate({
     entryCode: roomCode
   }, {
@@ -107,8 +106,8 @@ const joinRoom = (userId, roomCode) => {
  * @param {string} roomCode The 4 digit room code of the room being left.
  * @returns {Promise}
  */
-const leaveRoom = (userId, roomCode) => {
-  return new Promise(function (resolve, reject) {
+const leaveRoom = (userId: string, roomCode: string) => {
+  return new Promise<void>(function (resolve, reject) {
     Room.findOneAndUpdate({
       entryCode: roomCode
     }, {
@@ -118,7 +117,7 @@ const leaveRoom = (userId, roomCode) => {
       }
     }, {
       new: true // get result after performing the update.
-    }).then((room) => {
+    }).then((room: IRoom) => {
       // if room is empty, delete room
       if (room.participants.length === 0) {
         Room.deleteOne({
@@ -129,7 +128,7 @@ const leaveRoom = (userId, roomCode) => {
       } else {
         resolve()
       }
-    }).catch((err) => {
+    }).catch((err: Error) => {
       console.log(`Error leaving room: ${err}`)
       reject()
     })
@@ -141,7 +140,7 @@ const leaveRoom = (userId, roomCode) => {
  * @param {string} roomId The id of the room to get messages for.
  * @returns {Promise<Array<Object>>} Promise object represents an array of messages from the room.
  */
-const getRoomMessages = (roomId) => {
+const getRoomMessages = (roomId: string) => {
   return Room.findById(roomId)
     .populate({
       path: 'messages',
@@ -163,17 +162,17 @@ const getRoomMessages = (roomId) => {
  * @param {string} roomId The id of the room to send the message to.
  * @returns {Promise<Object>} Promise object represents the room state after message is sent.
  */
-const sendMessageToRoom = (message, userId, roomId) => {
+const sendMessageToRoom = (message: any, userId: string, roomId: string) => {
   return new Promise(function (resolve, reject) {
     Message.create({
-        author: new ObjectId(userId),
-        room: new ObjectId(roomId),
-        title: message.title,
-        date: Date.now(),
-        imageData: message.imageData,
-        background: message.background
-      })
-      .then((message) => {
+      author: new ObjectId(userId),
+      room: new ObjectId(roomId),
+      title: message.title,
+      date: Date.now(),
+      imageData: message.imageData,
+      background: message.background
+    })
+      .then((message: IMessage) => {
         Room.findByIdAndUpdate(roomId, {
           $push: {
             messages: new ObjectId(message._id)
@@ -187,10 +186,10 @@ const sendMessageToRoom = (message, userId, roomId) => {
             path: 'author',
             select: '-email -password'
           }
-        }).then((room) => {
+        }).then((room: IRoom) => {
           resolve(room)
         })
-      }).catch((err) => {
+      }).catch((err: Error) => {
         console.log(`Error sending message to room: ${err}`)
         reject()
       })
@@ -202,7 +201,7 @@ const sendMessageToRoom = (message, userId, roomId) => {
  * @param {string} messageId The id of the message to delete.
  * @returns {Promise}
  */
-const deleteMessageById = (messageId) => {
+const deleteMessageById = (messageId: string) => {
   return Message.findByIdAndDelete(messageId)
 }
 
@@ -211,7 +210,7 @@ const deleteMessageById = (messageId) => {
  * @param {string} userId The id of the user being fetched.
  * @returns {Promise<Object>} Promise object represents the fetched user profile.
  */
-const getUserProfileById = (userId) => {
+const getUserProfileById = (userId: string) => {
   return User.findById(userId, {
     name: 1,
     email: 1
@@ -223,7 +222,7 @@ const getUserProfileById = (userId) => {
  * @param {string} email The email of the user being fetched.
  * @returns {Promise<Object>} Promise object represents the fetched user profile.
  */
-const getUserProfileByEmail = (email) => {
+const getUserProfileByEmail = (email: string) => {
   return User.findOne({
     email: email
   })
@@ -236,7 +235,7 @@ const getUserProfileByEmail = (email) => {
  * @param {string} hashedPassword The password of the user being created, hashed and salted.
  * @returns {Promise<Object>} Promise object represents the created user profile.
  */
-const createUserProfile = (name, email, hashedPassword) => {
+const createUserProfile = (name: string, email: string, hashedPassword: string) => {
   return new Promise(function (resolve, reject) {
     User.create({
       name: name,
@@ -247,13 +246,13 @@ const createUserProfile = (name, email, hashedPassword) => {
       // log in user with token
       User.findOne({
         email: email
-      }).then((user) => {
+      }).then((user: IUser) => {
         resolve(user)
-      }).catch((err) => {
+      }).catch((err: Error) => {
         console.log(`Error finding new user: ${err}`)
         reject()
       })
-    }).catch((err) => {
+    }).catch((err: Error) => {
       console.log(`Error creating user profile: ${err}`)
       reject()
     })
@@ -269,13 +268,13 @@ const createUserProfile = (name, email, hashedPassword) => {
  * @param {string} updatedProperties.password The new password for the user (hashed and salted).
  * @returns {Promise<Object>} Promise object represents the updated user profile.
  */
-const updateUserProfile = (userId, updatedProperties) => {
+const updateUserProfile = (userId: string, updatedProperties: any) => {
   return User.findByIdAndUpdate(
     userId, {
-      $set: updatedProperties
-    }, {
-      new: true
-    }
+    $set: updatedProperties
+  }, {
+    new: true
+  }
   )
 }
 
