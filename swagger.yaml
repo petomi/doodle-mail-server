@@ -17,7 +17,7 @@ paths:
       summary: Connection test
       description: Retrieve a simple test message from the server.
       tags:
-        - Misc
+        - Doodle Mail
       operationId: Connectiontest
       deprecated: false
       responses:
@@ -32,7 +32,7 @@ paths:
     get:
       summary: Get All Room Info
       tags:
-        - Misc
+        - Doodle Mail
       operationId: GetAllRoomInfo
       deprecated: false
       produces:
@@ -63,7 +63,7 @@ paths:
     get:
       summary: Get Room Info
       tags:
-        - Misc
+        - Doodle Mail
       operationId: GetRoomInfo
       deprecated: false
       produces:
@@ -124,7 +124,7 @@ paths:
     post:
       summary: Create Room
       tags:
-        - Misc
+        - Doodle Mail
       operationId: CreateRoom
       deprecated: false
       produces:
@@ -161,7 +161,7 @@ paths:
     post:
       summary: Join Room
       tags:
-        - Misc
+        - Doodle Mail
       operationId: JoinRoom
       deprecated: false
       produces:
@@ -210,7 +210,7 @@ paths:
     post:
       summary: Leave Room
       tags:
-        - Misc
+        - Doodle Mail
       operationId: LeaveRoom
       deprecated: false
       produces:
@@ -237,7 +237,7 @@ paths:
     get:
       summary: Get Room Messages
       tags:
-        - Misc
+        - Doodle Mail
       operationId: GetRoomMessages
       deprecated: false
       produces:
@@ -277,7 +277,7 @@ paths:
     post:
       summary: Send Message To Room
       tags:
-        - Misc
+        - Doodle Mail
       operationId: SendMessageToRoom
       deprecated: false
       produces:
@@ -324,7 +324,7 @@ paths:
     delete:
       summary: Delete Message
       tags:
-        - Misc
+        - Doodle Mail
       operationId: DeleteMessage
       deprecated: false
       produces:
@@ -366,7 +366,7 @@ paths:
     get:
       summary: Get User
       tags:
-        - Misc
+        - Doodle Mail
       operationId: GetUser
       deprecated: false
       produces:
@@ -400,7 +400,7 @@ paths:
     post:
       summary: Create User
       tags:
-        - Misc
+        - Doodle Mail
       operationId: CreateUser
       deprecated: false
       produces:
@@ -437,7 +437,7 @@ paths:
     put:
       summary: Update User
       tags:
-        - Misc
+        - Doodle Mail
       operationId: UpdateUser
       deprecated: false
       produces:
@@ -474,7 +474,7 @@ paths:
     post:
       summary: Log In User
       tags:
-        - Misc
+        - Doodle Mail
       operationId: LogInUser
       deprecated: false
       produces:
@@ -655,5 +655,5 @@ definitions:
       - email
       - password
 tags:
-  - name: Misc
+  - name: Doodle Mail
     description: ""
