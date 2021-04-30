@@ -72,9 +72,6 @@ const logWithDate = (message: string, isError?: boolean) => {
 /**
  * API Routes
  */
-// TODO - create Express API endpoint documentation from comments (automated?) - use swagger-ui and swagger-jsdoc
-// TODO - fix failing automated tests on github (process.env variables are undefined)
-// TODO - split out server configuration or routes into their own modules
 
 /**
  * Retrieve a simple test message from the server.
