@@ -1,25 +1,23 @@
-const mongoose = require('mongoose')
-const {
-  User,
-  Message,
-  Room
-} = require('./models/schema.js')
+import Message, { IMessage } from "./models/message"
+import Room, { IRoom } from "./models/room"
+import User, { IUser } from "./models/user"
+import mongoose, { Query } from 'mongoose'
+import { IUpdatedUser } from "./models/updated-user"
+import { IMessageData } from "./models/message-data"
 const ObjectId = mongoose.Types.ObjectId
 
 
 /**
  * Creates a Mongo DB connection instance.
  */
-const createConnection = (mongoHost) => {
+const createConnection = (mongoHost: string): void => {
   mongoose.set('useFindAndModify', false)
-  mongoose.connect(mongoHost || 'mongodb://localhosts:27017/test', {
+  mongoose.connect(mongoHost, {
     useNewUrlParser: true,
     useUnifiedTopology: true
   })
   // if connection is successful, create DB and initialize server
-  var db = mongoose.connection
-  console.log('Database connection ready.')
-  console.log(process.env.MONGO_URL) // TODO: remove this, just for debug!
+  const db = mongoose.connection
   // bind connection on error event
   db.on('error', console.error.bind(console, 'MongoDB connection error:'))
 }
@@ -27,7 +25,7 @@ const createConnection = (mongoHost) => {
 /**
  * Closes the Mongo DB connection.
  */
-const closeConnection = () => {
+const closeConnection = (): void => {
   mongoose.disconnect()
 }
 
@@ -35,7 +33,7 @@ const closeConnection = () => {
  * Gets info for all chat rooms.
  * @returns {Promise<Array<Object>>}
  */
-const getAllRoomInfo = () => {
+const getAllRoomInfo = (): Query<IRoom[], IRoom> => {
   return Room.find({})
 }
 
@@ -44,7 +42,7 @@ const getAllRoomInfo = () => {
  * @param {string} roomCode The 4 digit code used to join the room.
  * @returns {Promise<Object>} Promise object represents the room info.
  */
-const getRoomInfo = (roomCode) => {
+const getRoomInfo = (roomCode: string): Query<IRoom | null, IRoom> => {
   return Room.findOne({
     entryCode: roomCode
   }).populate({
@@ -66,7 +64,7 @@ const getRoomInfo = (roomCode) => {
  * @param {string} roomCode The 4 digit code used to join the room.
  * @returns {Promise<Object>} Promise object represents the created room info.
  */
-const createRoom = (userId, roomCode) => {
+const createRoom = (userId: string, roomCode: string): Promise<IRoom> => {
   return Room.create({
     entryCode: roomCode,
     participants: [userId],
@@ -81,7 +79,7 @@ const createRoom = (userId, roomCode) => {
  * @returns {Promise<Object>} Promise object represents the room after joining.
  * @todo TODO: check whether user is already part of room before adding them
  */
-const joinRoom = (userId, roomCode) => {
+const joinRoom = (userId: string, roomCode: string): Query<IRoom | null, IRoom> => {
   return Room.findOneAndUpdate({
     entryCode: roomCode
   }, {
@@ -109,8 +107,8 @@ const joinRoom = (userId, roomCode) => {
  * @param {string} roomCode The 4 digit room code of the room being left.
  * @returns {Promise}
  */
-const leaveRoom = (userId, roomCode) => {
-  return new Promise(function (resolve, reject) {
+const leaveRoom = (userId: string, roomCode: string): Promise<void> => {
+  return new Promise<void>(function (resolve, reject) {
     Room.findOneAndUpdate({
       entryCode: roomCode
     }, {
@@ -120,9 +118,9 @@ const leaveRoom = (userId, roomCode) => {
       }
     }, {
       new: true // get result after performing the update.
-    }).then((room) => {
+    }).then((room: IRoom | null) => {
       // if room is empty, delete room
-      if (room.participants.length === 0) {
+      if (room != null && room.participants.length === 0) {
         Room.deleteOne({
           _id: room._id
         }).then(() => {
@@ -131,7 +129,7 @@ const leaveRoom = (userId, roomCode) => {
       } else {
         resolve()
       }
-    }).catch((err) => {
+    }).catch((err: Error) => {
       console.log(`Error leaving room: ${err}`)
       reject()
     })
@@ -143,7 +141,7 @@ const leaveRoom = (userId, roomCode) => {
  * @param {string} roomId The id of the room to get messages for.
  * @returns {Promise<Array<Object>>} Promise object represents an array of messages from the room.
  */
-const getRoomMessages = (roomId) => {
+const getRoomMessages = (roomId: string): Query<IRoom | null, IRoom> => {
   return Room.findById(roomId)
     .populate({
       path: 'messages',
@@ -165,17 +163,17 @@ const getRoomMessages = (roomId) => {
  * @param {string} roomId The id of the room to send the message to.
  * @returns {Promise<Object>} Promise object represents the room state after message is sent.
  */
-const sendMessageToRoom = (message, userId, roomId) => {
+const sendMessageToRoom = (message: IMessageData, userId: string, roomId: string): Promise<IRoom | null> => {
   return new Promise(function (resolve, reject) {
     Message.create({
-        author: new ObjectId(userId),
-        room: new ObjectId(roomId),
-        title: message.title,
-        date: Date.now(),
-        imageData: message.imageData,
-        background: message.background
-      })
-      .then((message) => {
+      author: new ObjectId(userId),
+      room: new ObjectId(roomId),
+      title: message.title,
+      date: Date.now(),
+      imageData: message.imageData,
+      background: message.background
+    })
+      .then((message: IMessage) => {
         Room.findByIdAndUpdate(roomId, {
           $push: {
             messages: new ObjectId(message._id)
@@ -189,10 +187,10 @@ const sendMessageToRoom = (message, userId, roomId) => {
             path: 'author',
             select: '-email -password'
           }
-        }).then((room) => {
+        }).then((room: IRoom | null) => {
           resolve(room)
         })
-      }).catch((err) => {
+      }).catch((err: Error) => {
         console.log(`Error sending message to room: ${err}`)
         reject()
       })
@@ -204,7 +202,7 @@ const sendMessageToRoom = (message, userId, roomId) => {
  * @param {string} messageId The id of the message to delete.
  * @returns {Promise}
  */
-const deleteMessageById = (messageId) => {
+const deleteMessageById = (messageId: string): Query<IMessage | null, IMessage> => {
   return Message.findByIdAndDelete(messageId)
 }
 
@@ -213,7 +211,7 @@ const deleteMessageById = (messageId) => {
  * @param {string} userId The id of the user being fetched.
  * @returns {Promise<Object>} Promise object represents the fetched user profile.
  */
-const getUserProfileById = (userId) => {
+const getUserProfileById = (userId: string): Query<IUser | null, IUser> => {
   return User.findById(userId, {
     name: 1,
     email: 1
@@ -225,7 +223,7 @@ const getUserProfileById = (userId) => {
  * @param {string} email The email of the user being fetched.
  * @returns {Promise<Object>} Promise object represents the fetched user profile.
  */
-const getUserProfileByEmail = (email) => {
+const getUserProfileByEmail = (email: string): Query<IUser | null, IUser> => {
   return User.findOne({
     email: email
   })
@@ -238,7 +236,7 @@ const getUserProfileByEmail = (email) => {
  * @param {string} hashedPassword The password of the user being created, hashed and salted.
  * @returns {Promise<Object>} Promise object represents the created user profile.
  */
-const createUserProfile = (name, email, hashedPassword) => {
+const createUserProfile = (name: string, email: string, hashedPassword: string): Promise<IUser | null> => {
   return new Promise(function (resolve, reject) {
     User.create({
       name: name,
@@ -249,13 +247,13 @@ const createUserProfile = (name, email, hashedPassword) => {
       // log in user with token
       User.findOne({
         email: email
-      }).then((user) => {
+      }).then((user: IUser | null) => {
         resolve(user)
-      }).catch((err) => {
+      }).catch((err: Error) => {
         console.log(`Error finding new user: ${err}`)
         reject()
       })
-    }).catch((err) => {
+    }).catch((err: Error) => {
       console.log(`Error creating user profile: ${err}`)
       reject()
     })
@@ -271,17 +269,17 @@ const createUserProfile = (name, email, hashedPassword) => {
  * @param {string} updatedProperties.password The new password for the user (hashed and salted).
  * @returns {Promise<Object>} Promise object represents the updated user profile.
  */
-const updateUserProfile = (userId, updatedProperties) => {
+const updateUserProfile = (userId: string, updatedProperties: IUpdatedUser): Query<IUser | null, IUser> => {
   return User.findByIdAndUpdate(
     userId, {
-      $set: updatedProperties
-    }, {
-      new: true
-    }
+    $set: updatedProperties
+  }, {
+    new: true
+  }
   )
 }
 
-module.exports = {
+export default {
   createConnection,
   closeConnection,
   getAllRoomInfo,

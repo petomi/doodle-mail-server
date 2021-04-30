@@ -1,0 +1,659 @@
+swagger: "2.0"
+info:
+  version: "1.0"
+  title: Doodle Mail
+  contact: {}
+host: localhost:5000
+basePath: /
+schemes:
+  - http
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /:
+    get:
+      summary: Connection test
+      description: Retrieve a simple test message from the server.
+      tags:
+        - Doodle Mail
+      operationId: Connectiontest
+      deprecated: false
+      responses:
+        '200':
+          description: A test message.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Welcome to doodle-mail!
+  /rooms/info:
+    get:
+      summary: Get All Room Info
+      tags:
+        - Doodle Mail
+      operationId: GetAllRoomInfo
+      deprecated: false
+      produces:
+        - application/json
+      parameters: []
+      responses:
+        '200':
+          description: "An array of room objects."
+          headers: {}
+          content:
+            application/json:
+              schema:
+              type: string
+              example:
+                {
+                  "rooms":
+                    [
+                      {
+                        "participants": ["6083303610cd25158809b909"],
+                        "messages": ["608330e010cd25158809b90c"],
+                        "_id": "6083307c10cd25158809b90b",
+                        "entryCode": "cBSL",
+                        "__v": 0,
+                      },
+                    ],
+                }
+  /rooms/{roomCode}/info:
+    get:
+      summary: Get Room Info
+      tags:
+        - Doodle Mail
+      operationId: GetRoomInfo
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: roomCode
+          in: path
+          required: true
+          type: string
+          description: ""
+      responses:
+        '200':
+          description: A room object
+          headers: {}
+          content:
+            application/json:
+              schema:
+                type: string
+                example:
+                  {
+                    "room":
+                      {
+                        "participants":
+                          [
+                            {
+                              "_id": "6083303610cd25158809b909",
+                              "name": "Michael Test",
+                              "__v": 0,
+                            },
+                          ],
+                        "messages":
+                          [
+                            {
+                              "_id": "60870957094e2509b8671159",
+                              "author":
+                                {
+                                  "_id": "6083303610cd25158809b909",
+                                  "name": "Michael Test",
+                                  "email": "test@test.com",
+                                  "password": "$2b$08$qbfD8ygxyDr0WKIQ1VSyueRNrjgy0upLq1RsYR.8/0tgTCcAbfIoC",
+                                  "__v": 0,
+                                },
+                              "title": "Test Message 4",
+                              "date": "1619462487946",
+                              "imageData": "TALKJLASJD",
+                              "background": "blue",
+                              "__v": 0,
+                            },
+                          ],
+                        "_id": "6086f4f3c251c729b4a041a6",
+                        "entryCode": "abcd",
+                        "__v": 0,
+                      },
+                  }
+        '400':
+          description: Bad request. Missing room code in URL or internal error.
+  /rooms:
+    post:
+      summary: Create Room
+      tags:
+        - Doodle Mail
+      operationId: CreateRoom
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: Body
+          in: body
+          required: true
+          description: ""
+          schema:
+            $ref: "#/definitions/CreateRoomRequest"
+      responses:
+        '200':
+          description: A room object.
+          headers: {}
+          content:
+            application/json:
+              schema:
+                type: string
+                example:
+                  {
+                    "room":
+                      {
+                        "participants": ["6083303610cd25158809b909"],
+                        "messages": [],
+                        "_id": "608ac3a16774c31aa8c8082b",
+                        "entryCode": "kQ0g",
+                        "__v": 0,
+                      },
+                  }
+        '400':
+          description: Bad Request. Missing userId in request body or other error.
+  /rooms/{roomCode}/join:
+    post:
+      summary: Join Room
+      tags:
+        - Doodle Mail
+      operationId: JoinRoom
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: roomCode
+          in: path
+          required: true
+          type: string
+          description: ""
+        - name: Body
+          in: body
+          required: true
+          description: ""
+          schema:
+            $ref: "#/definitions/JoinRoomRequest"
+      responses:
+        '200':
+          description: "A room object."
+          headers: {}
+          content:
+            application/json:
+              schema:
+                type: string
+                example:
+                  {
+                    "room":
+                      {
+                        "participants":
+                          [
+                            {
+                              "_id": "6083303610cd25158809b909",
+                              "name": "Michael Test",
+                              "__v": 0,
+                            },
+                          ],
+                        "messages": [],
+                        "_id": "6086f4f3c251c729b4a041a6",
+                        "entryCode": "vnOk",
+                        "__v": 0,
+                      },
+                  }
+        '400':
+          description: Bad Request. Missing roomCode in URL params or userId in request body, or user already exists in room.
+  /rooms/{roomCode}/leave:
+    post:
+      summary: Leave Room
+      tags:
+        - Doodle Mail
+      operationId: LeaveRoom
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: roomCode
+          in: path
+          required: true
+          type: string
+          description: ""
+        - name: Body
+          in: body
+          required: true
+          description: ""
+          schema:
+            $ref: "#/definitions/LeaveRoomRequest"
+      responses:
+        '200':
+          description: "An OK response."
+          headers: {}
+        '400':
+          description: Bad Request. Missing roomCode in URL parameters or userId in request body, or user does not exist in room.
+  /rooms/{roomId}/messages:
+    get:
+      summary: Get Room Messages
+      tags:
+        - Doodle Mail
+      operationId: GetRoomMessages
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          type: string
+          description: The room _id
+      responses:
+        '200':
+          description: An array of message objects.
+          content:
+            application/json:
+              schema:
+                type: string
+                example:
+                  [
+                    {
+                      "_id": "60870957094e2509b8671159",
+                      "author":
+                        {
+                          "_id": "6083303610cd25158809b909",
+                          "name": "Michael Test",
+                          "__v": 0,
+                        },
+                      "title": "Test Message 4",
+                      "date": "1619462487946",
+                      "imageData": "TALKJLASJD",
+                      "background": "blue",
+                      "__v": 0,
+                    },
+                  ]
+        '400':
+          description: Bad Request. Missing roomId in URL params or userId in request body, or user is not part of room.
+    post:
+      summary: Send Message To Room
+      tags:
+        - Doodle Mail
+      operationId: SendMessageToRoom
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          type: string
+          description: The room _id
+        - name: Body
+          in: body
+          required: true
+          description: ""
+          schema:
+            $ref: "#/definitions/SendMessageToRoomRequest"
+      responses:
+        '200':
+          description: An array containing the room's messages, after adding the newly created message.
+          content:
+            application/json:
+              schema:
+                type: string
+                example:
+                  [
+                    {
+                      "_id": "60870957094e2509b8671159",
+                      "author":
+                        {
+                          "_id": "6083303610cd25158809b909",
+                          "name": "Michael Test",
+                          "__v": 0,
+                        },
+                      "title": "Test Message 4",
+                      "date": "1619462487946",
+                      "imageData": "TALKJLASJD",
+                      "background": "blue",
+                      "__v": 0,
+                    },
+                  ]
+        '400':
+          description: Bad Request. Missing roomId in URL params or userId or message details in request body, or user is not in room.
+  /messages:
+    delete:
+      summary: Delete Message
+      tags:
+        - Doodle Mail
+      operationId: DeleteMessage
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: Body
+          in: body
+          required: true
+          description: ""
+          schema:
+            $ref: "#/definitions/DeleteMessageRequest"
+      responses:
+        '200':
+          description: An array containing the room's messages, after adding the newly created message.
+          content:
+            application/json:
+              schema:
+                type: string
+                example:
+                  [
+                    {
+                      "_id": "60870957094e2509b8671159",
+                      "author":
+                        {
+                          "_id": "6083303610cd25158809b909",
+                          "name": "Michael Test",
+                          "__v": 0,
+                        },
+                      "title": "Test Message 4",
+                      "date": "1619462487946",
+                      "imageData": "TALKJLASJD",
+                      "background": "blue",
+                      "__v": 0,
+                    },
+                  ]
+        '400':
+          description: Bad Request. Missing roomId in URL params or userId or message details in request body, or user is not in room.
+  /users/{userGuid}:
+    get:
+      summary: Get User
+      tags:
+        - Doodle Mail
+      operationId: GetUser
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: userGuid
+          in: path
+          required: true
+          type: string
+          description: ""
+      responses:
+        '200':
+          description: "A user profile."
+          headers: {}
+          content:
+            application/json:
+              schema:
+                type: string
+                example:
+                  {
+                    "user":
+                      {
+                        "_id": "6083303610cd25158809b909",
+                        "name": "Michael Test",
+                        "email": "test@test.com",
+                      },
+                  }
+        '400':
+          description: Bad Request. Missing parameters or server error.
+  /users:
+    post:
+      summary: Create User
+      tags:
+        - Doodle Mail
+      operationId: CreateUser
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: Body
+          in: body
+          required: true
+          description: ""
+          schema:
+            $ref: "#/definitions/CreateUserRequest"
+      responses:
+        '200':
+          description: "A user object and login token."
+          headers: {}
+          content:
+            application/json:
+              schema:
+                type: string
+                example:
+                  {
+                    "auth": true,
+                    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjYwOGI2ODcyYjIxNGVjM2Q0OGQ3ZGNmMCIsImlhdCI6MTYxOTc0ODk3OCwiZXhwIjoxNjE5ODM1Mzc4fQ.NrWwIpxfI75BQGny2UEOyaNvCUbnoDcL1EW2cnfYyR0",
+                    "user":
+                      {
+                        "_id": "608b6872b214ec3d48d7dcf0",
+                        "name": "Timmy Test",
+                        "email": "test15@test.com",
+                        "password": "$2b$08$afu9d5B6KYvYKHEycg0B0O9CAPPZo1QEZU099VibgJkcKTds4cSP.",
+                        "__v": 0,
+                      },
+                  }
+        '400': Bad request. Missing parameters, duplicate email detected, or server error.
+    put:
+      summary: Update User
+      tags:
+        - Doodle Mail
+      operationId: UpdateUser
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: Body
+          in: body
+          required: true
+          description: ""
+          schema:
+            $ref: "#/definitions/UpdateUserRequest"
+      responses:
+        '200':
+          description: "The updated user object."
+          headers: {}
+          content:
+            application/json:
+              schema:
+                type: string
+                example:
+                  {
+                    "user":
+                      {
+                        "_id": "608b6872b214ec3d48d7dcf0",
+                        "name": "Tommy Test",
+                        "email": "test24@test.com",
+                        "password": "$2b$08$y9qITFkA9lsKvoou.9vRCuv13LdbdgefmDJ6ZSKHSY3a.pmqXYeFG",
+                        "__v": 0,
+                      },
+                  }
+        '400':
+          description: Bad request. Missing parameters, duplicate email detected, or server error.
+  /users/login:
+    post:
+      summary: Log In User
+      tags:
+        - Doodle Mail
+      operationId: LogInUser
+      deprecated: false
+      produces:
+        - application/json
+      parameters:
+        - name: Body
+          in: body
+          required: true
+          description: ""
+          schema:
+            $ref: "#/definitions/LogInUserRequest"
+      responses:
+        '200':
+          description: "The user object and login token."
+          headers: {}
+          content:
+            application/json:
+              schema:
+                type: string
+                example:
+                  {
+                    "auth": true,
+                    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjYwODcwZjY2ODlkMDZiMzQ4ODhhMzlhZCIsImlhdCI6MTYxOTc0OTI5OCwiZXhwIjoxNjE5ODM1Njk4fQ.agPRJi2mAwq08VvmYGxMjjQL0RgwizriezBogISFLAQ",
+                    "user":
+                      {
+                        "_id": "60870f6689d06b34888a39ad",
+                        "name": "Timmy Test",
+                        "email": "test5@test.com",
+                        "password": "$2b$08$kX78IJjezsgh/YD/F6J19euAZ.ajfi6WY1LiEIMxxTGUn9IKDlzzy",
+                        "__v": 0,
+                      },
+                  }
+        '400':
+          description: Bad request, missing parameters, or server error.
+definitions:
+  CreateRoomRequest:
+    title: CreateRoomRequest
+    example:
+      userId: 6083303610cd25158809b909
+    type: object
+    properties:
+      userId:
+        type: string
+    required:
+      - userId
+  JoinRoomRequest:
+    title: JoinRoomRequest
+    example:
+      userId: 6083306010cd25158809b90a
+    type: object
+    properties:
+      userId:
+        type: string
+    required:
+      - userId
+  LeaveRoomRequest:
+    title: LeaveRoomRequest
+    example:
+      userId: 6080758e09a1148592e46e02
+    type: object
+    properties:
+      userId:
+        type: string
+    required:
+      - userId
+  SendMessageToRoomRequest:
+    title: SendMessageToRoomRequest
+    example:
+      userId: 6083303610cd25158809b909
+      messages:
+        - title: Test Message 4
+          imageData: TALKJLASJD
+          background: blue
+    type: object
+    properties:
+      userId:
+        type: string
+      messages:
+        type: array
+        items:
+          $ref: "#/definitions/Message"
+    required:
+      - userId
+      - messages
+  Message:
+    title: Message
+    example:
+      title: Test Message 4
+      imageData: TALKJLASJD
+      background: blue
+    type: object
+    properties:
+      title:
+        type: string
+      imageData:
+        type: string
+      background:
+        type: string
+    required:
+      - title
+      - imageData
+      - background
+  DeleteMessageRequest:
+    title: DeleteMessageRequest
+    example:
+      messageId: 608330e010cd25158809b90c
+    type: object
+    properties:
+      messageId:
+        type: string
+    required:
+      - messageId
+  CreateUserRequest:
+    title: CreateUserRequest
+    example:
+      name: Timmy Test
+      email: test5@test.com
+      password: abcd
+    type: object
+    properties:
+      name:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+    required:
+      - name
+      - email
+      - password
+  LogInUserRequest:
+    title: LogInUserRequest
+    example:
+      email: test5@test.com
+      password: abcd
+    type: object
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+      - email
+      - password
+  UpdateUserRequest:
+    title: UpdateUserRequest
+    example:
+      userId: 6082ce5736f3b92b9cc169fb
+      updatedProperties:
+        name: Tommy Test
+        email: test10@test.com
+        password: abcdef
+    type: object
+    properties:
+      userId:
+        type: string
+      updatedProperties:
+        $ref: "#/definitions/UpdatedProperties"
+    required:
+      - userId
+      - updatedProperties
+  UpdatedProperties:
+    title: UpdatedProperties
+    example:
+      name: Tommy Test
+      email: test10@test.com
+      password: abcdef
+    type: object
+    properties:
+      name:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+    required:
+      - name
+      - email
+      - password
+tags:
+  - name: Doodle Mail
+    description: ""

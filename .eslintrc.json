@@ -3,23 +3,29 @@
         "es6": true,
         "node": true
     },
-    "extends": "eslint:recommended",
+    "root": true,
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaVersion": 2018,
+      "sourceType": "module"
+    },
+    "extends": [
+      "eslint:recommended",
+      "plugin:@typescript-eslint/eslint-recommended",
+      "plugin:@typescript-eslint/recommended"
+    ],
     "globals": {
         "Atomics": "readonly",
         "SharedArrayBuffer": "readonly"
     },
-    "parserOptions": {
-        "ecmaVersion": 2018,
-        "sourceType": "module"
-    },
+
     "rules": {
     },
     "overrides": [
         {
             "files": [
-                "**/*.spec.js",
-                "**/*.spec.jsx",
-                "**/jest.setup.js"
+                "**/*.spec.ts",
+                "**/*.spec.tsx"
             ],
             "env": {
                 "jest": true
