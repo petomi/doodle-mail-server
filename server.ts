@@ -10,6 +10,7 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import nanoid from 'nanoid'
 import swaggerUi from 'swagger-ui-express'
+import YAML from 'yamljs'
 import dbhelper from './dbhelper'
 import { IMessageData } from "./models/message-data"
 // const multer = require('multer')
@@ -39,35 +40,7 @@ const corsOptions: cors.CorsOptions = {
 
 app.use(cors(corsOptions))
 
-// set up swagger documentation
-const swaggerDefinition = {
-  openapi: '3.0.0',
-  info: {
-    title: 'Doodle Mail API',
-    version: '1.0.0',
-    description: `This is the REST API for Doodle Mail, an application created with Express and MongoDB.
-      It allows users to send pictures they draw on their devices to each other in a chat room environment.`,
-    servers: [{
-      url: 'http://localhost:5000',
-      description: 'Development server'
-    },
-    {
-      url: 'https://doodle-mail-server.herokuapp.com',
-      description: 'Production server'
-    }
-    ]
-  }
-}
-
-const swaggerOptions = {
-  swaggerDefinition,
-  apis: ['./server.js']
-}
-
-// TODO: figure out way to auto-generate documentation without using swaggerJSDoc, which was very messy.
-// potentially using TSOA?
-const swaggerSpec = {}
-// const swaggerSpec = swaggerJSDoc(swaggerOptions)
+const swaggerSpec = YAML.load('./swagger.yaml')
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
