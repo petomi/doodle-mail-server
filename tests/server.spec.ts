@@ -124,6 +124,17 @@ describe('POST /rooms/:roomCode/join', () => {
         done()
       })
   })
+  it(`Returns an error if the user is already in the room.`, done => {
+    agent
+      .post('/rooms/ABCD/join')
+      .send({
+        userId: allUsers[0]._id
+      })
+      .expect(400)
+      .then(() => {
+        done()
+      })
+  })
   it(`Returns an error if the userId is not specified.`, done => {
     agent
       .post('/rooms/ABCD/join')

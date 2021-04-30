@@ -156,7 +156,6 @@ app.post('/rooms', function (req: express.Request, res: express.Response) {
 /**
  * Add user to a room selected by room code, then return the room.
  */
-// TODO: check if user is already in room before you add them
 app.post('/rooms/:roomCode/join', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'POST')
   res.header('Content-Type', 'application/json')
@@ -164,18 +163,39 @@ app.post('/rooms/:roomCode/join', function (req: express.Request, res: express.R
   // join an existing room using a code
   if (req.params.roomCode != null && req.body.userId != null) {
     logWithDate(`User ${req.body.userId} attempting to join room with code ${req.params.roomCode}`)
-    // find room by roomCode, add user to it, and populate the array of users in room
-    dbhelper.joinRoom(req.body.userId, req.params.roomCode).then((room: IRoom | null) => {
-      // return data for room
-      return res.status(200).send({
-        room: room
+    dbhelper.getRoomInfo(req.params.roomCode).then((room) => {
+      if (room == null) {
+        logWithDate(`Failed to add user ${req.body.userId} to room ${req.params.roomCode}: room is null`)
+        return res.status(400).send({
+          message: `Room does not exist.`
+        })
+      }
+      if(room.participants.filter(p => p._id == req.body.userId).length > 0){
+        logWithDate(`User ${req.body.userId} already exists in room ${req.params.roomCode}`)
+        return res.status(400).send({
+          message: `User is already in room.`
+        })
+      }
+      // find room by roomCode, add user to it, and populate the array of users in room
+      dbhelper.joinRoom(req.body.userId, req.params.roomCode).then((room: IRoom | null) => {
+        logWithDate(`Joined room successfully.`)
+        // return data for room
+        return res.status(200).send({
+          room: room
+        })
+      }).catch((err: Error) => {
+        logWithDate(`Failed to add user ${req.body.userId} to room ${req.params.roomCode}: ${err}`, true)
+        return res.status(400).send({
+          message: `Failed to add user to room`
+        })
       })
     }).catch((err: Error) => {
       logWithDate(`Failed to add user ${req.body.userId} to room ${req.params.roomCode}: ${err}`, true)
-      return res.status(400).send({
-        message: `Failed to add user to room`
-      })
+        return res.status(400).send({
+          message: `Failed to add user to room`
+        })
     })
+
   } else {
     logWithDate(`Missing roomCode in URL params or userId in request body`)
     // throw error if data is incomplete.

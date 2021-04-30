@@ -77,7 +77,6 @@ const createRoom = (userId: string, roomCode: string): Promise<IRoom> => {
  * @param {string} userId The id of the user joining the room.
  * @param {string} roomCode The 4 digit room code of the room being joined.
  * @returns {Promise<Object>} Promise object represents the room after joining.
- * @todo TODO: check whether user is already part of room before adding them
  */
 const joinRoom = (userId: string, roomCode: string): Query<IRoom | null, IRoom> => {
   return Room.findOneAndUpdate({
