@@ -184,38 +184,24 @@ const deleteMessageById = (messageId: string): Query<IMessage | null, IMessage> 
 }
 
 /**
- * Generate a 4 character room code (and check for collisions)
+ * Generate 4 character room code and check for uniqueness.
  * @returns {Promise<string>}
  */
-const generateRoomCode = () : Promise<string>  => {
-  return new Promise<string>(function(resolve, reject) {
-    // create a room with unique 4 char guid
-    let roomCode = nanoid.nanoid(4)
-    let roomCodeValid = false
-    let numberOfRegens = 0
-    // check for roomCode collisions (unlikely, but let's be safe)
-    while (!roomCodeValid) {
-      getRoomInfo(roomCode).then((existingRoom) => {
-        if (existingRoom == null) {
-          // keep this roomCode, as it is unique
-          roomCodeValid = true
-          resolve(roomCode)
-        } else if (numberOfRegens > 5) {
-          // break out if too many collisions are happening
-          reject()
-        }
-        else {
-          console.log(existingRoom)
-          // generate a new roomCode
-          logWithDate(`Room code ${roomCode} was taken. Generating another.`)
-          roomCode = nanoid.nanoid(4)
-          numberOfRegens++
-        }
-      })
+const generateUniqueRoomCode = async (): Promise<string> => {
+  let isUniqueCode = false
+  let roomCode = nanoid.nanoid(4)
+  while (!isUniqueCode) {
+    // check to see if roomCode already exists
+    console.log(`Checking roomCode ${roomCode} for uniqueness.`)
+    const room: IRoom | null = await getRoomInfo(roomCode)
+    if (room != null) {
+      // generate another roomCode since the last one wasn't unique
+      roomCode = nanoid.nanoid(4)
+    } else {
+      isUniqueCode = true
     }
-    reject()
-  })
-
+  }
+  return roomCode
 }
 
 export default {
@@ -229,5 +215,5 @@ export default {
   getRoomMessages,
   sendMessageToRoom,
   deleteMessageById,
-  generateRoomCode
+  generateUniqueRoomCode
 }
