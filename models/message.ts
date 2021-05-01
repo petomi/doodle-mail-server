@@ -1,9 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose'
 import { IRoom } from './room'
-import { IUser } from './user'
 
 export interface IMessage extends Document {
-  author: IUser['_id'],
+  author: string,
   room: IRoom['_id'],
   title: string,
   date: string,
@@ -13,8 +12,7 @@ export interface IMessage extends Document {
 
 const MessageSchema: Schema = new Schema({
   author: {
-    type: Schema.Types.ObjectId,
-    ref: 'user',
+    type: String,
     required: true
   },
   room: {

@@ -1,16 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import request from 'supertest'
-import bcrypt from 'bcrypt'
 import testdb from './test-db'
 import serverApp from '../server'
 import { IMessage } from '../models/message'
 import Room, { IRoom } from '../models/room'
-import { IUser } from '../models/user'
 
 const agent = request.agent(serverApp)
 
-let allUsers: Array<IUser>
-let user: IUser
 let room: IRoom
 let message: IMessage
 
@@ -34,14 +30,12 @@ afterAll(async () => {
 beforeEach(async () => {
   await testdb.clear()
   await testdb.seed()
-  allUsers = await testdb.getAllUsers()
-  user = await testdb.getUser()
   room = await testdb.getRoom()
   message = await testdb.getMessage()
 })
 
 describe('GET /', () => {
-  it('It should return a welcome message.', done => {
+  it('It should return a welcome message.', (done) => {
     agent
       .get('/')
       .expect(200)
@@ -58,7 +52,7 @@ describe('GET /', () => {
  * Tests
  */
 describe('GET /rooms/info', () => {
-  it('It should return all the available room data.', done => {
+  it('It should return all the available room data.', (done) => {
     agent
       .get('/rooms/info')
       .expect(200)
@@ -71,7 +65,7 @@ describe('GET /rooms/info', () => {
 })
 
 describe('GET /rooms/:roomCode/info', () => {
-  it('It should return data for a specific room.', done => {
+  it('It should return data for a specific room.', (done) => {
     agent
       .get('/rooms/ABCD/info')
       .expect(200)
@@ -85,12 +79,11 @@ describe('GET /rooms/:roomCode/info', () => {
 })
 
 describe('POST /rooms', () => {
-  it('It should create a new room.', async (done) => {
-
+  it('It should create a new room.', (done) => {
     agent
       .post('/rooms')
       .send({
-        userId: allUsers[0]._id
+        userName: 'pleb'
       })
       .expect(200)
       .then((res: { body: { room: { entryCode: string | any[]; participants: string | any[] } } }) => {
@@ -99,7 +92,7 @@ describe('POST /rooms', () => {
         done()
       })
   })
-  it(`Returns an error if the userId is not specified.`, done => {
+  it(`Returns an error if the userName is not specified.`, (done) => {
     agent
       .post('/rooms')
       .send({})
@@ -111,11 +104,11 @@ describe('POST /rooms', () => {
 })
 
 describe('POST /rooms/:roomCode/join', () => {
-  it('It should add the user to the room', async (done) => {
+  it('It should add the user to the room', (done) => {
     agent
       .post('/rooms/ABCD/join')
       .send({
-        userId: allUsers[2]._id
+        userName: 'jarl'
       })
       .expect(200)
       .then((res: { body: { room: { entryCode: any; participants: string | any[] } } }) => {
@@ -124,18 +117,18 @@ describe('POST /rooms/:roomCode/join', () => {
         done()
       })
   })
-  it(`Returns an error if the user is already in the room.`, done => {
+  it(`Returns an error if the user is already in the room.`, (done) => {
     agent
       .post('/rooms/ABCD/join')
       .send({
-        userId: allUsers[0]._id
+        userName: 'pleb'
       })
       .expect(400)
       .then(() => {
         done()
       })
   })
-  it(`Returns an error if the userId is not specified.`, done => {
+  it(`Returns an error if the userName is not specified.`, (done) => {
     agent
       .post('/rooms/ABCD/join')
       .send({})
@@ -147,29 +140,29 @@ describe('POST /rooms/:roomCode/join', () => {
 })
 
 describe('POST /rooms/:roomCode/leave', () => {
-  it('It should remove the user from the room.', async (done) => {
+  it('It should remove the user from the room.', (done) => {
     agent
       .post('/rooms/ABCD/leave')
       .send({
-        userId: allUsers[0]._id
+        userName: 'pleb'
       })
       .expect(200)
       .then(() => {
         done()
       })
   })
-  it('Removes the room if all users have left.', async (done) => {
+  it('Removes the room if all users have left.', (done) => {
     agent
       .post('/rooms/ABCD/leave')
       .send({
-        userId: allUsers[0]._id
+        userName: 'pleb'
       })
       .expect(200)
       .then(() => {
         agent
           .post('/rooms/ABCD/leave')
           .send({
-            userId: allUsers[1]._id
+            userName: 'bob'
           })
           .expect(200)
           .then(async () => {
@@ -184,7 +177,7 @@ describe('POST /rooms/:roomCode/leave', () => {
           })
       })
   })
-  it(`Returns an error if the userId is not specified.`, done => {
+  it(`Returns an error if the userName is not specified.`, (done) => {
     agent
       .post('/rooms/ABCD/leave')
       .send({})
@@ -196,32 +189,19 @@ describe('POST /rooms/:roomCode/leave', () => {
 })
 
 describe('GET /rooms/:roomId/messages', () => {
-  it('Gets all messages for the selected room.', async (done) => {
+  it('Gets all messages for the selected room.', (done) => {
     agent
       .get(`/rooms/${room._id}/messages`)
-      .send({
-        userId: room.participants[0]._id
-      })
       .expect(200)
       .then((res: { body: string | any[] }) => {
         expect(res.body.length).toBe(2)
         done()
       })
   })
-  it(`Returns an error if the userId is not authorized.`, async (done) => {
+  it('Returns an error if invalid roomId is given.', (done) => {
     agent
-      .get(`/rooms/${room._id}/messages`)
-      .send({})
-      .expect(401)
-      .then(() => {
-        done()
-      })
-  })
-  it(`Returns an error if the userId is not specified.`, async (done) => {
-    agent
-      .get(`/rooms/${room._id}/messages`)
-      .send({})
-      .expect(401)
+      .get(`/rooms/123/messages`)
+      .expect(400)
       .then(() => {
         done()
       })
@@ -229,7 +209,7 @@ describe('GET /rooms/:roomId/messages', () => {
 })
 
 describe('POST /rooms/:roomId/messages', () => {
-  it('Adds a message to the indicated room.', async (done) => {
+  it('Adds a message to the indicated room.', (done) => {
     agent
       .post(`/rooms/${room._id}/messages`)
       .send({
@@ -238,7 +218,7 @@ describe('POST /rooms/:roomId/messages', () => {
           imageData: 'TALKJLASJD',
           background: 'blue'
         }],
-        userId: user._id
+        userName: 'pleb'
       })
       .expect(200)
       .then((res: { body: string | any[] }) => {
@@ -246,7 +226,7 @@ describe('POST /rooms/:roomId/messages', () => {
         done()
       })
   })
-  it('Adds multiple messages to the indicated room.', async (done) => {
+  it('Adds multiple messages to the indicated room.', (done) => {
     agent
       .post(`/rooms/${room._id}/messages`)
       .send({
@@ -261,7 +241,7 @@ describe('POST /rooms/:roomId/messages', () => {
           "background": 'white'
         }
         ],
-        userId: user._id
+        userName: 'pleb'
       })
       .expect(200)
       .then((res: { body: string | any[] }) => {
@@ -269,7 +249,7 @@ describe('POST /rooms/:roomId/messages', () => {
         done()
       })
   })
-  it(`Returns an error if the userId is not specified.`, async (done) => {
+  it(`Returns an error if the userName is not specified.`, (done) => {
     agent
       .post(`/rooms/${room._id}/messages`)
       .send({
@@ -290,11 +270,11 @@ describe('POST /rooms/:roomId/messages', () => {
         done()
       })
   })
-  it('Returns an error if messages are not specified.', async (done) => {
+  it('Returns an error if messages are not specified.', (done) => {
     agent
       .post(`/rooms/${room._id}/messages`)
       .send({
-        userId: user._id
+        userName: 'pleb'
       })
       .expect(400)
       .then(() => {
@@ -304,7 +284,7 @@ describe('POST /rooms/:roomId/messages', () => {
 })
 
 describe('DELETE /messages', () => {
-  it('Deletes the desired message', async (done) => {
+  it('Deletes the desired message', (done) => {
     agent
       .delete('/messages')
       .send({
@@ -315,192 +295,10 @@ describe('DELETE /messages', () => {
         done()
       })
   })
-  it(`Returns an error if the userId is not specified.`, done => {
+  it(`Returns an error if the messageId is not specified.`, (done) => {
     agent
       .delete('/messages')
       .send({})
-      .expect(400)
-      .then(() => {
-        done()
-      })
-  })
-})
-
-describe('GET /users/:userId', () => {
-  it('Gets a user by profile id.', async (done) => {
-    agent
-      .get(`/users/${user._id}`)
-      .expect(200)
-      .then((res: { body: { user: { _id: { toString: () => any } } } }) => {
-        expect(res.body.user._id.toString()).toBe(user._id.toString())
-        done()
-      })
-  })
-})
-
-describe('POST /users', () => {
-  it('Adds a new user profile.', done => {
-    const newUser = {
-      name: 'Test Test',
-      email: 'test100@test.com',
-      password: 'abcd'
-    }
-    agent
-      .post('/users')
-      .send(newUser)
-      .expect(200)
-      .then((res: { body: { user: { name: any; email: any; password: any } } }) => {
-        expect(res.body.user.name).toBe(newUser.name)
-        expect(res.body.user.email).toBe(newUser.email)
-        expect(bcrypt.compareSync(res.body.user.password, newUser.password))
-        done()
-      })
-  })
-  it(`Returns an error if the user email is already in use.`, done => {
-    agent
-      .post('/users')
-      .send({
-        name: 'Test Test',
-        email: 'test@test.com',
-        password: 'abcd'
-      })
-      .expect(400)
-      .then(() => {
-        done()
-      })
-  })
-  it(`Returns an error if the user info is not specified.`, done => {
-    agent
-      .post('/users')
-      .send({})
-      .expect(400)
-      .then(() => {
-        done()
-      })
-  })
-})
-
-describe('POST /users/login', () => {
-  it('Logs in the user.', done => {
-    agent
-      .post('/users/login')
-      .send({
-        email: 'test@test.com',
-        password: 'abcd'
-      })
-      .expect(200)
-      .then((res: { body: { user: { email: any }; token: any } }) => {
-        expect(res.body.user.email).toBe('test@test.com')
-        expect(res.body.token).not.toBe(null)
-        done()
-      })
-  })
-  it(`Returns an error if the password is not correct.`, done => {
-    agent
-      .post('/users/login')
-      .send({
-        email: 'test@test.com',
-        password: '123'
-      })
-      .expect(401)
-      .then((res: { body: { auth: any; token: any } }) => {
-        expect(res.body.auth).toBe(false)
-        expect(res.body.token).toBe(null)
-        done()
-      })
-  })
-  it(`Returns an error if the email is not correct.`, done => {
-    agent
-      .post('/users/login')
-      .send({
-        email: 'abc@test.com',
-        password: 'abcd'
-      })
-      .expect(401)
-      .then((res: { body: { auth: any; token: any } }) => {
-        expect(res.body.auth).toBe(false)
-        expect(res.body.token).toBe(null)
-        done()
-      })
-  })
-  it(`Returns an error if the login info is not specified.`, done => {
-    agent
-      .post('/users/login')
-      .send({})
-      .expect(400)
-      .then(() => {
-        done()
-      })
-  })
-})
-
-describe('PUT /users', () => {
-  // use describe to make the tests synchronous (avoid bcrypt issue)
-  it('Updates the user profile (no password)', async (done) => {
-    agent
-      .put('/users')
-      .send({
-        userId: user._id,
-        updatedProperties: {
-          name: 'new name',
-          email: 'test88@test.com'
-        }
-      })
-      .expect(200)
-      .then((res: { body: { user: { name: any; email: any } } }) => {
-        expect(res.body.user.name).toBe('new name')
-        expect(res.body.user.email).toBe('test88@test.com')
-        done()
-      })
-  })
-  // use describe to make the tests synchronous
-  it('Updates the user profile (with password)', async (done) => {
-    agent
-      .put('/users')
-      .send({
-        userId: user._id,
-        updatedProperties: {
-          password: 'cdef'
-        }
-      })
-      .expect(200)
-      .then((res: { body: { user: { password: any } } }) => {
-        expect(bcrypt.compareSync(res.body.user.password, 'cdef'))
-        done()
-      })
-  })
-  it('Handles situations where no updated data is provided', async (done) => {
-    agent
-      .put('/users')
-      .send({
-        userId: user._id
-      })
-      .expect(400)
-      .then(() => {
-        done()
-      })
-  })
-  it(`Returns an error if the user email is already in use.`, done => {
-    agent
-      .post('/users')
-      .send({
-        name: 'Test Test',
-        email: 'test@test.com',
-        password: 'abcd'
-      })
-      .expect(400)
-      .then(() => {
-        done()
-      })
-  })
-  it(`Returns an error if the login info is not specified.`, done => {
-    agent
-      .put('/users')
-      .send({
-        updatedProperties: {
-          password: 'cdef'
-        }
-      })
       .expect(400)
       .then(() => {
         done()
