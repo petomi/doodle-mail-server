@@ -1,10 +1,9 @@
 import mongoose, { Schema, Document } from 'mongoose'
 import { IMessage } from './message'
-import { IUser } from './user'
 
 export interface IRoom extends Document {
   entryCode: string,
-  participants: Array<IUser['_id']>,
+  participants: Array<string>,
   messages: Array<IMessage['_id']>
 }
 
@@ -14,8 +13,8 @@ const RoomSchema: Schema = new Schema({
     required: true
   },
   participants: [{
-    type: Schema.Types.ObjectId,
-    ref: 'user'
+    type: String,
+    required: true
   }],
   messages: [{
     type: Schema.Types.ObjectId,

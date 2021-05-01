@@ -1,9 +1,9 @@
-import Message, { IMessage } from "./models/message"
-import Room, { IRoom } from "./models/room"
-import User, { IUser } from "./models/user"
+import nanoid from 'nanoid'
+import logWithDate from './loghelper'
+import Message, { IMessage } from "../models/message"
+import Room, { IRoom } from "../models/room"
 import mongoose, { Query } from 'mongoose'
-import { IUpdatedUser } from "./models/updated-user"
-import { IMessageData } from "./models/message-data"
+import { IMessageData } from "../models/message-data"
 const ObjectId = mongoose.Types.ObjectId
 
 
@@ -46,74 +46,60 @@ const getRoomInfo = (roomCode: string): Query<IRoom | null, IRoom> => {
   return Room.findOne({
     entryCode: roomCode
   }).populate({
-    path: 'participants',
-    select: '-email -password'
-  }).populate({
     path: 'messages',
-    select: '-room',
-    populate: {
-      path: 'author',
-      select: '-email-password'
-    }
+    select: '-room'
   })
 }
 
 /**
  * Create a new chat room.
- * @param {string} userId The id of the user creating the room.
+ * @param {string} userName The id of the user creating the room.
  * @param {string} roomCode The 4 digit code used to join the room.
  * @returns {Promise<Object>} Promise object represents the created room info.
  */
-const createRoom = (userId: string, roomCode: string): Promise<IRoom> => {
+const createRoom = (userName: string, roomCode: string): Promise<IRoom> => {
   return Room.create({
     entryCode: roomCode,
-    participants: [userId],
+    participants: [userName],
     messages: []
   })
 }
 
 /**
  * Join a chat room by room code.
- * @param {string} userId The id of the user joining the room.
+ * @param {string} userName The id of the user joining the room.
  * @param {string} roomCode The 4 digit room code of the room being joined.
  * @returns {Promise<Object>} Promise object represents the room after joining.
  */
-const joinRoom = (userId: string, roomCode: string): Query<IRoom | null, IRoom> => {
+const joinRoom = (userName: string, roomCode: string): Query<IRoom | null, IRoom> => {
   return Room.findOneAndUpdate({
     entryCode: roomCode
   }, {
     $push: {
-      participants: new ObjectId(userId)
+      participants: userName
     }
   }, {
     new: true // get result after performing the update
   }).populate({
-    path: 'participants',
-    select: '-email -password'
-  }).populate({
     path: 'messages',
-    select: '-room',
-    populate: {
-      path: 'author',
-      select: '-email-password'
-    }
+    select: '-room'
   })
 }
 
 /**
  * Leave chat room by room code.
- * @param {string} userId The id of the user that is leaving the room.
+ * @param {string} userName The id of the user that is leaving the room.
  * @param {string} roomCode The 4 digit room code of the room being left.
  * @returns {Promise}
  */
-const leaveRoom = (userId: string, roomCode: string): Promise<void> => {
+const leaveRoom = (userName: string, roomCode: string): Promise<void> => {
   return new Promise<void>(function (resolve, reject) {
     Room.findOneAndUpdate({
       entryCode: roomCode
     }, {
       // remove user from room by id
       $pull: {
-        participants: new ObjectId(userId)
+        participants: userName
       }
     }, {
       new: true // get result after performing the update.
@@ -144,11 +130,7 @@ const getRoomMessages = (roomId: string): Query<IRoom | null, IRoom> => {
   return Room.findById(roomId)
     .populate({
       path: 'messages',
-      select: '-room',
-      populate: {
-        path: 'author',
-        select: '-email -password'
-      }
+      select: '-room'
     })
 }
 
@@ -158,14 +140,14 @@ const getRoomMessages = (roomId: string): Query<IRoom | null, IRoom> => {
  * @param {string} message.title The title of the message.
  * @param {string} message.imageData The image data, saved to a base64 string.
  * @param {string} message.background The background color of the image, as hex code or name.
- * @param {string} userId The id of the user sending the message.
+ * @param {string} userName The id of the user sending the message.
  * @param {string} roomId The id of the room to send the message to.
  * @returns {Promise<Object>} Promise object represents the room state after message is sent.
  */
-const sendMessageToRoom = (message: IMessageData, userId: string, roomId: string): Promise<IRoom | null> => {
+const sendMessageToRoom = (message: IMessageData, userName: string, roomId: string): Promise<IRoom | null> => {
   return new Promise(function (resolve, reject) {
     Message.create({
-      author: new ObjectId(userId),
+      author: userName,
       room: new ObjectId(roomId),
       title: message.title,
       date: new Date(),
@@ -181,11 +163,7 @@ const sendMessageToRoom = (message: IMessageData, userId: string, roomId: string
           new: true
         }).populate({
           path: 'messages',
-          select: '-room',
-          populate: {
-            path: 'author',
-            select: '-email -password'
-          }
+          select: '-room'
         }).then((room: IRoom | null) => {
           resolve(room)
         })
@@ -206,76 +184,38 @@ const deleteMessageById = (messageId: string): Query<IMessage | null, IMessage> 
 }
 
 /**
- * Get a user profile by profile id.
- * @param {string} userId The id of the user being fetched.
- * @returns {Promise<Object>} Promise object represents the fetched user profile.
+ * Generate a 4 character room code (and check for collisions)
+ * @returns {Promise<string>}
  */
-const getUserProfileById = (userId: string): Query<IUser | null, IUser> => {
-  return User.findById(userId, {
-    name: 1,
-    email: 1
-  })
-}
-
-/**
- * Get a user profile by email.
- * @param {string} email The email of the user being fetched.
- * @returns {Promise<Object>} Promise object represents the fetched user profile.
- */
-const getUserProfileByEmail = (email: string): Query<IUser | null, IUser> => {
-  return User.findOne({
-    email: email
-  })
-}
-
-/**
- * Create a user profile.
- * @param {string} name The name of the user being created.
- * @param {string} email The email of the user being created.
- * @param {string} hashedPassword The password of the user being created, hashed and salted.
- * @returns {Promise<Object>} Promise object represents the created user profile.
- */
-const createUserProfile = (name: string, email: string, hashedPassword: string): Promise<IUser | null> => {
-  return new Promise(function (resolve, reject) {
-    User.create({
-      name: name,
-      email: email,
-      password: hashedPassword,
-      // avatar: req.body.avatar,
-    }).then(() => {
-      // log in user with token
-      User.findOne({
-        email: email
-      }).then((user: IUser | null) => {
-        resolve(user)
-      }).catch((err: Error) => {
-        console.log(`Error finding new user: ${err}`)
-        reject()
+const generateRoomCode = () : Promise<string>  => {
+  return new Promise<string>(function(resolve, reject) {
+    // create a room with unique 4 char guid
+    let roomCode = nanoid.nanoid(4)
+    let roomCodeValid = false
+    let numberOfRegens = 0
+    // check for roomCode collisions (unlikely, but let's be safe)
+    while (!roomCodeValid) {
+      getRoomInfo(roomCode).then((existingRoom) => {
+        if (existingRoom == null) {
+          // keep this roomCode, as it is unique
+          roomCodeValid = true
+          resolve(roomCode)
+        } else if (numberOfRegens > 5) {
+          // break out if too many collisions are happening
+          reject()
+        }
+        else {
+          console.log(existingRoom)
+          // generate a new roomCode
+          logWithDate(`Room code ${roomCode} was taken. Generating another.`)
+          roomCode = nanoid.nanoid(4)
+          numberOfRegens++
+        }
       })
-    }).catch((err: Error) => {
-      console.log(`Error creating user profile: ${err}`)
-      reject()
-    })
+    }
+    reject()
   })
-}
 
-/**
- * Update a user profile by user id.
- * @param {string} userId The id of the user being updated.
- * @param {Object} updatedProperties An object containing the udpates to make for the user profile.
- * @param {string?} updatedProperties.name The new name of the user.
- * @param {string} updatedProperties.email The new email for the user.
- * @param {string} updatedProperties.password The new password for the user (hashed and salted).
- * @returns {Promise<Object>} Promise object represents the updated user profile.
- */
-const updateUserProfile = (userId: string, updatedProperties: IUpdatedUser): Query<IUser | null, IUser> => {
-  return User.findByIdAndUpdate(
-    userId, {
-    $set: updatedProperties
-  }, {
-    new: true
-  }
-  )
 }
 
 export default {
@@ -289,8 +229,5 @@ export default {
   getRoomMessages,
   sendMessageToRoom,
   deleteMessageById,
-  getUserProfileById,
-  getUserProfileByEmail,
-  createUserProfile,
-  updateUserProfile
+  generateRoomCode
 }
