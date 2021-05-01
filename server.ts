@@ -116,8 +116,7 @@ app.post('/rooms', async function (req: express.Request, res: express.Response) 
   if (req.body.userName != null) {
     // generate room code
     logWithDate(`Generating unique 4 digit room code`)
-    const roomCode = await dbhelper.generateRoomCode()
-
+    const roomCode: string = await dbhelper.generateUniqueRoomCode()
     logWithDate(`Creating room for user: ${req.body.userName} with code: ${roomCode}`)
     // create room in db
     dbhelper.createRoom(req.body.userName, roomCode).then((room: IRoom) => {
@@ -155,7 +154,7 @@ app.post('/rooms/:roomCode/join', function (req: express.Request, res: express.R
         })
       }
       // check name against existing room occupants
-      if(room.participants.includes(req.body.userName)){
+      if (room.participants.includes(req.body.userName)) {
         logWithDate(`User ${req.body.userName} already exists in room ${req.params.roomCode}`)
         return res.status(400).send({
           message: `Someone with same name is already in room.`
@@ -176,9 +175,9 @@ app.post('/rooms/:roomCode/join', function (req: express.Request, res: express.R
       })
     }).catch((err: Error) => {
       logWithDate(`Failed to add user ${req.body.userName} to room ${req.params.roomCode}: ${err}`, true)
-        return res.status(400).send({
-          message: `Failed to add user to room.`
-        })
+      return res.status(400).send({
+        message: `Failed to add user to room.`
+      })
     })
 
   } else {
