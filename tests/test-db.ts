@@ -75,7 +75,7 @@ const seed = () => {
           author: new ObjectId(users[0]._id),
           room: new ObjectId(room._id),
           title: 'Test Message 1',
-          date: Date.now(),
+          date: new Date(),
           imageData: 'testimagedata',
           background: 'white'
         },
@@ -83,7 +83,7 @@ const seed = () => {
           author: new ObjectId(users[1]._id),
           room: new ObjectId(room._id),
           title: 'Test Message 2',
-          date: Date.now(),
+          date: new Date(),
           imageData: 'testimagedata',
           background: 'white'
         }

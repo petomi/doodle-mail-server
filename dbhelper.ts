@@ -168,7 +168,7 @@ const sendMessageToRoom = (message: IMessageData, userId: string, roomId: string
       author: new ObjectId(userId),
       room: new ObjectId(roomId),
       title: message.title,
-      date: Date.now(),
+      date: new Date(),
       imageData: message.imageData,
       background: message.background
     })

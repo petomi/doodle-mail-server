@@ -60,7 +60,7 @@ if (process.env.NODE_ENV !== 'test') {
  * Set up logging method
  */
 const logWithDate = (message: string, isError?: boolean) => {
-  const currentTime = Date.now()
+  const currentTime = new Date()
   if (isError) {
     console.error(`${currentTime}: ${message}`)
   } else {
