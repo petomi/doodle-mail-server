@@ -9,6 +9,7 @@ import YAML from 'yamljs'
 import dbhelper from './helpers/dbhelper'
 import logWithDate from './helpers/loghelper'
 import { IMessageData } from "./models/message-data"
+import { IMessage } from "./models/message"
 
 /**
  * Configure Express Server
@@ -290,16 +291,23 @@ app.post('/rooms/:roomId/messages', function (req: express.Request, res: express
 /**
  * Delete message by messageId
  */
-app.delete('/messages', function (req: express.Request, res: express.Response) {
+app.delete('/rooms/:roomId/messages', function (req: express.Request, res: express.Response) {
   res.header('Access-Control-Allow-Methods', 'DELETE')
   res.header('Content-Type', 'application/json')
   logWithDate(`@DELETE /messages`)
   if (req.body.messageId != null) {
-    logWithDate(`Deleting message with id ${req.body.messageId}`)
-    dbhelper.deleteMessageById(req.body.messageId)
-      .then(() => {
-        logWithDate(`Message deleted successfully`)
-        return res.sendStatus(200)
+    logWithDate(`Deleting message with id ${req.body.messageId} from room ${req.params.roomId}`)
+    dbhelper.deleteMessageById(req.body.messageId).then(() => {
+        dbhelper.getRoomMessages(req.params.roomId).then((room: IRoom | null) => {
+          logWithDate(`Message deleted successfully`)
+          const messages: IMessage[] = (room != null) ? room.messages : []
+          return res.status(200).send(messages)
+        }).catch((err: Error) => {
+          logWithDate(`Failed to retrieve messages for room ${req.params.roomId}: ${err}`, true)
+          return res.status(400).send({
+            message: `Failed to get room messages.`
+          })
+        })
       }).catch((err: Error) => {
         logWithDate(`Failed to delete message with id ${req.body.messageId}: ${err}`, true)
         return res.status(400).send({

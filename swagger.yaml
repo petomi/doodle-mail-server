@@ -290,7 +290,6 @@ paths:
                   ]
         "400":
           description: Bad Request. Missing roomId in URL params or userName or message details in request body, or user is not in room.
-  /messages:
     delete:
       summary: Delete Message
       tags:
@@ -308,7 +307,7 @@ paths:
             $ref: "#/definitions/DeleteMessageRequest"
       responses:
         "200":
-          description: An array containing the room's messages, after adding the newly created message.
+          description: An array containing the room's messages, after deleting the message.
           content:
             application/json:
               schema:

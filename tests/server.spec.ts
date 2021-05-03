@@ -286,18 +286,19 @@ describe('POST /rooms/:roomId/messages', () => {
 describe('DELETE /messages', () => {
   it('Deletes the desired message', (done) => {
     agent
-      .delete('/messages')
+      .delete(`/rooms/${room._id}/messages`)
       .send({
         messageId: message._id
       })
       .expect(200)
-      .then(() => {
+      .then((res) => {
+        expect(res.body.length).toBe(1)
         done()
       })
   })
   it(`Returns an error if the messageId is not specified.`, (done) => {
     agent
-      .delete('/messages')
+      .delete(`/rooms/${room._id}/messages`)
       .send({})
       .expect(400)
       .then(() => {
