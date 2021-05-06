@@ -46,7 +46,10 @@ const getRoomInfo = (roomCode: string): Query<IRoom | null, IRoom> => {
     entryCode: roomCode
   }).populate({
     path: 'messages',
-    select: '-room'
+    select: '-room',
+    options: {
+      sort: { 'date': -1 }
+    }
   })
 }
 
@@ -81,7 +84,10 @@ const joinRoom = (userName: string, roomCode: string): Query<IRoom | null, IRoom
     new: true // get result after performing the update
   }).populate({
     path: 'messages',
-    select: '-room'
+    select: '-room',
+    options: {
+      sort: { 'date': -1 }
+    }
   })
 }
 
@@ -129,7 +135,10 @@ const getRoomMessages = (roomId: string): Query<IRoom | null, IRoom> => {
   return Room.findById(roomId)
     .populate({
       path: 'messages',
-      select: '-room'
+      select: '-room',
+      options: {
+        sort: { 'date': -1 }
+      }
     })
 }
 
@@ -162,7 +171,10 @@ const sendMessageToRoom = (message: IMessageData, userName: string, roomId: stri
           new: true
         }).populate({
           path: 'messages',
-          select: '-room'
+          select: '-room',
+          options: {
+            sort: { 'date': -1 }
+          }
         }).then((room: IRoom | null) => {
           resolve(room)
         })
