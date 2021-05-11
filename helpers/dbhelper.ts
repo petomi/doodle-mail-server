@@ -108,17 +108,8 @@ const leaveRoom = (userName: string, roomCode: string): Promise<void> => {
       }
     }, {
       new: true // get result after performing the update.
-    }).then((room: IRoom | null) => {
-      // if room is empty, delete room
-      if (room != null && room.participants.length === 0) {
-        Room.deleteOne({
-          _id: room._id
-        }).then(() => {
-          resolve()
-        })
-      } else {
-        resolve()
-      }
+    }).then(() => {
+      resolve()
     }).catch((err: Error) => {
       console.log(`Error leaving room: ${err}`)
       reject()
