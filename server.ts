@@ -1,6 +1,7 @@
-import { IRoom } from "./models/room"
 import dotenv from 'dotenv'
 import express from 'express'
+import http from 'http'
+import { Server } from 'socket.io'
 import path from 'path'
 import bodyParser from 'body-parser'
 import cors from 'cors'
@@ -8,6 +9,7 @@ import swaggerUi from 'swagger-ui-express'
 import YAML from 'yamljs'
 import dbhelper from './helpers/dbhelper'
 import logWithDate from './helpers/loghelper'
+import { IRoom } from "./models/room"
 import { IMessageData } from "./models/message-data"
 import { IMessage } from "./models/message"
 
@@ -38,6 +40,13 @@ app.use(cors(corsOptions))
 const swaggerSpec = YAML.load('./swagger.yaml')
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+// create server and websocket
+const server = http.createServer(app)
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins
+  }
+})
 
 // connect to mongo and start web server if not a test
 if (process.env.NODE_ENV !== 'test') {
@@ -47,9 +56,24 @@ if (process.env.NODE_ENV !== 'test') {
 
   // start server
   const port = process.env.PORT || 5000
-  app.listen(port)
-  console.log('server started on port: ' + port)
+  server.listen(port, () => {
+    console.log('server started on port: ' + port)
+  })
+  // Web Socket listener
+  io.on('connection', (socket) => {
+    console.log('a user connected')
+
+    // TODO: migrate REST routes here, see https://socket.io/get-started/basic-crud-application/
+    // see also https://socket.io/get-started/private-messaging-part-1/#Review
+
+    socket.on('disconnect', () => {
+      console.log('user disconnected.')
+      // TODO - remove user from room
+    })
+  })
 }
+
+
 
 /**
  * API Routes
