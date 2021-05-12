@@ -5,8 +5,6 @@ import { Server } from 'socket.io'
 import path from 'path'
 import bodyParser from 'body-parser'
 import cors from 'cors'
-import swaggerUi from 'swagger-ui-express'
-import YAML from 'yamljs'
 import dbhelper from './helpers/dbhelper'
 import logWithDate from './helpers/loghelper'
 import { IRoom } from "./models/room"
@@ -36,15 +34,21 @@ const corsOptions: cors.CorsOptions = {
 }
 app.use(cors(corsOptions))
 
-const swaggerSpec = YAML.load('./swagger.yaml')
-
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 // create server and websocket
 const server = http.createServer(app)
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins
   }
+})
+// socket gets userName from socket auth
+io.use((socket, next) => {
+  const userName = socket.handshake.auth.userName
+  if (!userName) {
+    return next(new Error('invalid username'))
+  }
+  socket.data.userName = userName
+  next()
 })
 
 // start server
@@ -99,8 +103,14 @@ if (process.env.NODE_ENV !== 'test') {
         logWithDate(`Creating room for user: ${userName} with code: ${roomCode}`)
         // create room in db
         dbhelper.createRoom(userName, roomCode).then((room: IRoom) => {
+          // listen for broadcasts to that specific roomCode
+          socket.join(roomCode)
           socket.emit('room:create', {
             room: room
+          })
+          // TODO: make this generic alert emit?
+          io.to(roomCode).emit('user:joined', {
+            message: `User ${userName} joined the room.`
           })
         }).catch((err: Error) => {
           logWithDate(`Failed to create room for user ${userName}: ${err}`, true)
@@ -117,9 +127,8 @@ if (process.env.NODE_ENV !== 'test') {
       }
     })
 
-    // TODO: emit to specific user only
+    // joins an existing room
     // TODO: get username from auth instead
-    // TODO: add rooms to segregate user broadcasts, see https://socket.io/docs/v4/rooms/
     socket.on('rooms:join', (roomCode, userName) => {
       logWithDate(`@POST /rooms/${roomCode}/join`)
       // join an existing room using a code
@@ -142,9 +151,15 @@ if (process.env.NODE_ENV !== 'test') {
           // find room by roomCode, add user to it, and populate the array of users in room
           dbhelper.joinRoom(userName, roomCode).then((room: IRoom | null) => {
             logWithDate(`Joined room successfully.`)
+            // listen for broadcasts to that specific roomCode
+            socket.join(roomCode)
             // return data for room
             socket.emit('room:join', {
               room: room
+            })
+            // TODO: make this generic alert emit?
+            io.to(roomCode).emit('user:joined', {
+              message: `User ${userName} joined the room.`
             })
           }).catch((err: Error) => {
             logWithDate(`Failed to add user ${userName} to room ${roomCode}: ${err}`, true)
@@ -167,9 +182,9 @@ if (process.env.NODE_ENV !== 'test') {
       }
     })
 
+    // leaves a room
     // TODO: emit to specific user only
     // TODO: get username from auth instead
-    // TODO: add rooms to segregate user broadcasts, see https://socket.io/docs/v4/rooms/
     socket.on('rooms:leave', (roomCode, userName) => {
       logWithDate(`@POST /rooms/${roomCode}/leave`)
       // join an existing room using a code
@@ -177,8 +192,13 @@ if (process.env.NODE_ENV !== 'test') {
         logWithDate(`User ${userName} attempting to leave room with code ${roomCode}`)
         // find room by code and leave it
         dbhelper.leaveRoom(userName, roomCode).then(() => {
+          socket.leave(roomCode)
           socket.emit('room:leave', {
             message: 'ok'
+          })
+          // TODO: make this generic alert emit?
+          io.to(roomCode).emit('user:left', {
+            message: `User ${userName} left the room.`
           })
         }).catch((err: Error) => {
           logWithDate(`Failed to remove user ${userName} from room ${roomCode}: ${err}`, true)
@@ -196,7 +216,6 @@ if (process.env.NODE_ENV !== 'test') {
     })
 
     // send room messages to user
-    // TODO: use rooms to segregate user broadcasts, see https://socket.io/docs/v4/rooms/
     // TODO: just get user's current room, instead of passing in roomId, and get messages for that
     socket.on('rooms:messages', (roomId) => {
       logWithDate(`@GET /rooms/${roomId}/messages`)
@@ -219,7 +238,6 @@ if (process.env.NODE_ENV !== 'test') {
       })
     })
 
-    // TODO: add rooms to segregate user broadcasts, see https://socket.io/docs/v4/rooms/
     // TODO: emit new messages to all users in room
     // TODO: get username from auth instead
     socket.on('rooms:messages:send', (roomId, userName, messages) => {
@@ -245,7 +263,7 @@ if (process.env.NODE_ENV !== 'test') {
         Promise.all(messageWrites).then(() => {
           logWithDate(`Wrote all messages successfully.`)
           if (result != null) {
-            socket.emit('messages', {
+            io.to(result.entryCode).emit('messages', {
               messages: result.messages
             })
           }
@@ -270,20 +288,32 @@ if (process.env.NODE_ENV !== 'test') {
       }
     })
 
-    // TODO: add rooms to segregate user broadcasts, see https://socket.io/docs/v4/rooms/
-    // TODO: emit new messages to all users in room
+    // delete a message
     socket.on('rooms:messages:delete', (messageId, roomId, userName) => {
-      // TODO: check if user exists in room and is message author before deleting
       logWithDate(`@DELETE /messages`)
       if (messageId != null) {
         logWithDate(`Deleting message with id ${messageId} from room ${roomId}`)
-        dbhelper.deleteMessageById(messageId).then(() => {
+        dbhelper.getMessageById(messageId).then((message) => {
+          if (message?.author !== userName) {
+            socket.emit('error', {
+              message: 'Only the author is allowed to delete this message.'
+            })
+            return
+          }
+          dbhelper.deleteMessageById(messageId).then(() => {
             dbhelper.getRoomMessages(roomId).then((room: IRoom | null) => {
-              logWithDate(`Message deleted successfully`)
-              const messages: IMessage[] = (room != null) ? room.messages : []
-              socket.emit('messages', {
-                messages: messages
-              })
+              if (room != null) {
+                logWithDate(`Message deleted successfully`)
+                const messages: IMessage[] = (room != null) ? room.messages : []
+                io.to(room.entryCode).emit('messages', {
+                  messages: messages
+                })
+              } else {
+                logWithDate(`Failed to delete message. Room does not exist.`)
+                socket.emit('error', {
+                  message: 'Room does not exist.'
+                })
+              }
             }).catch((err: Error) => {
               logWithDate(`Failed to retrieve messages for room ${roomId}: ${err}`, true)
               socket.emit('error', {
@@ -296,6 +326,8 @@ if (process.env.NODE_ENV !== 'test') {
               message: `Failed to delete message`
             })
           })
+        })
+
       } else {
         logWithDate(`Missing messageId in request body`)
         socket.emit('error', {

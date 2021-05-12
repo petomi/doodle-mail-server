@@ -177,6 +177,15 @@ const sendMessageToRoom = (message: IMessageData, userName: string, roomId: stri
 }
 
 /**
+ * Returns info for a single message by id.
+ * @param messageId The id of the message to find
+ * @returns {Promise<Object>}
+ */
+const getMessageById = (messageId: string): Query<IMessage | null, IMessage> => {
+  return Message.findById(messageId)
+}
+
+/**
  * Delete a message by message id.
  * @param {string} messageId The id of the message to delete.
  * @returns {Promise}
@@ -216,6 +225,7 @@ export default {
   leaveRoom,
   getRoomMessages,
   sendMessageToRoom,
+  getMessageById,
   deleteMessageById,
   generateUniqueRoomCode
 }
