@@ -47,7 +47,10 @@ io.use((socket, next) => {
   if (!userName) {
     return next(new Error('invalid username'))
   }
-  socket.data.userName = userName
+  socket.data.user = {
+    userName: userName,
+    id: socket.id
+  }
   next()
 })
 
@@ -93,22 +96,21 @@ if (process.env.NODE_ENV !== 'test') {
     })
 
     // creates a new room and returns room info
-    // TODO: get username from auth instead?
-    socket.on('rooms:create', async (userName) => {
+    socket.on('rooms:create', async () => {
       logWithDate(`@POST /rooms`)
+      const userName = socket.data.user.userName
       if (userName != null) {
         // generate room code
         logWithDate(`Generating unique 4 digit room code`)
         const roomCode: string = await dbhelper.generateUniqueRoomCode()
         logWithDate(`Creating room for user: ${userName} with code: ${roomCode}`)
         // create room in db
-        dbhelper.createRoom(userName, roomCode).then((room: IRoom) => {
+        dbhelper.createRoom(socket.data.user, roomCode).then((room: IRoom) => {
           // listen for broadcasts to that specific roomCode
           socket.join(roomCode)
           socket.emit('room:create', {
             room: room
           })
-          // TODO: make this generic alert emit?
           io.to(roomCode).emit('user:joined', {
             message: `User ${userName} joined the room.`
           })
@@ -128,9 +130,9 @@ if (process.env.NODE_ENV !== 'test') {
     })
 
     // joins an existing room
-    // TODO: get username from auth instead
-    socket.on('rooms:join', (roomCode, userName) => {
+    socket.on('rooms:join', (roomCode) => {
       logWithDate(`@POST /rooms/${roomCode}/join`)
+      const userName = socket.data.user.userName
       // join an existing room using a code
       if (roomCode != null && userName != null) {
         logWithDate(`User ${userName} attempting to join room with code ${roomCode}`)
@@ -140,16 +142,17 @@ if (process.env.NODE_ENV !== 'test') {
             socket.emit('error', {
               message: `Room does not exist.`
             })
+            return
           }
           // check name against existing room occupants
-          if (room?.participants.includes(userName)) {
+          if ((room?.participants.filter((x) => x.userName === userName).length ?? 0) > 0) {
             logWithDate(`User ${userName} already exists in room ${roomCode}`)
             socket.emit('error', {
               message: `Someone with same name is already in room.`
             })
           }
           // find room by roomCode, add user to it, and populate the array of users in room
-          dbhelper.joinRoom(userName, roomCode).then((room: IRoom | null) => {
+          dbhelper.joinRoom(socket.data.user, roomCode).then((room: IRoom | null) => {
             logWithDate(`Joined room successfully.`)
             // listen for broadcasts to that specific roomCode
             socket.join(roomCode)
@@ -157,7 +160,6 @@ if (process.env.NODE_ENV !== 'test') {
             socket.emit('room:join', {
               room: room
             })
-            // TODO: make this generic alert emit?
             io.to(roomCode).emit('user:joined', {
               message: `User ${userName} joined the room.`
             })
@@ -183,20 +185,19 @@ if (process.env.NODE_ENV !== 'test') {
     })
 
     // leaves a room
-    // TODO: emit to specific user only
-    // TODO: get username from auth instead
-    socket.on('rooms:leave', (roomCode, userName) => {
+    socket.on('rooms:leave', (roomCode) => {
       logWithDate(`@POST /rooms/${roomCode}/leave`)
+      const userName = socket.data.user.userName
       // join an existing room using a code
       if (roomCode != null && userName != null) {
         logWithDate(`User ${userName} attempting to leave room with code ${roomCode}`)
         // find room by code and leave it
-        dbhelper.leaveRoom(userName, roomCode).then(() => {
+        dbhelper.leaveRoom(socket.data.user, roomCode).then(() => {
+          logWithDate(`User ${userName} left room ${roomCode} successfully.`)
           socket.leave(roomCode)
           socket.emit('room:leave', {
             message: 'ok'
           })
-          // TODO: make this generic alert emit?
           io.to(roomCode).emit('user:left', {
             message: `User ${userName} left the room.`
           })
@@ -238,10 +239,10 @@ if (process.env.NODE_ENV !== 'test') {
       })
     })
 
-    // TODO: emit new messages to all users in room
-    // TODO: get username from auth instead
-    socket.on('rooms:messages:send', (roomId, userName, messages) => {
+    // send a message to the room
+    socket.on('rooms:messages:send', (roomId, messages) => {
       logWithDate(`@POST /rooms/${roomId}/messages`)
+      const userName = socket.data.user.userName
       let result: IRoom | null = null
       if (roomId != null && userName != null && messages != null) {
         logWithDate(`Sending message from user ${userName} to room ${roomId}`)
@@ -249,7 +250,7 @@ if (process.env.NODE_ENV !== 'test') {
         const messageWrites = messages.map((message: IMessageData) => {
           return new Promise<void>((resolve, reject) => {
             // insert each message into DB collection
-            dbhelper.sendMessageToRoom(message, userName, roomId)
+            dbhelper.sendMessageToRoom(message, socket.data.user, roomId)
               .then((room: IRoom | null) => {
                 result = room
                 resolve()
@@ -289,12 +290,13 @@ if (process.env.NODE_ENV !== 'test') {
     })
 
     // delete a message
-    socket.on('rooms:messages:delete', (messageId, roomId, userName) => {
+    socket.on('rooms:messages:delete', (messageId, roomId) => {
       logWithDate(`@DELETE /messages`)
+      const userName = socket.data.user.userName
       if (messageId != null) {
         logWithDate(`Deleting message with id ${messageId} from room ${roomId}`)
         dbhelper.getMessageById(messageId).then((message) => {
-          if (message?.author !== userName) {
+          if (message?.author?.userName !== userName) {
             socket.emit('error', {
               message: 'Only the author is allowed to delete this message.'
             })

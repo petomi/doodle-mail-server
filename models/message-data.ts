@@ -1,4 +1,4 @@
-export interface IMessageData extends Document {
+export interface IMessageData {
   title: string,
   imageData: string,
   background: string
