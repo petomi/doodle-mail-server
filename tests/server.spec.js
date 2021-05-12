@@ -9,6 +9,9 @@ let room
 let message
 let io, serverSocket, clientSocket
 
+// TODO: rewrite all tests to use sockets
+// see: https://socket.io/docs/v4/testing/
+
 /**
  * Connect to a new in-memory DB before running tests
  */
