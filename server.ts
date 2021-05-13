@@ -85,9 +85,13 @@ io.on('connection', (socket) => {
   socket.on('rooms:messages:delete', (messageId, roomId) => deleteMessage(messageId, roomId))
 
   // TODO: may be able to factor out joining + leaving rooms as sockets make it irrelevant
-
+  // TODO: refactor these methods further into logic modules and add server.spec.ts with unit tests for them
   // TODO: better code comments here
-  // returns room info for specific room
+
+  /**
+   * Returns room info for specific room
+   * @param {string} roomCode
+   */
   function getRoomInfo (roomCode: string) {
     logWithDate(`@GET /rooms/${roomCode}/info`)
     if (roomCode != null) {
@@ -110,7 +114,9 @@ io.on('connection', (socket) => {
     }
   }
 
-  // creates a new room and returns room info
+  /**
+   * Creates a new room and adds user to it.
+   */
   async function createRoom () {
     logWithDate(`@POST /rooms`)
     const userName = socket.data.user.userName
@@ -145,7 +151,10 @@ io.on('connection', (socket) => {
     }
   }
 
-  // joins an existing room
+  /**
+   * Adds a user to an existing room.
+   * @param {string} roomCode
+   */
   function joinRoom (roomCode: string) {
     logWithDate(`@POST /rooms/${roomCode}/join`)
     const userName = socket.data.user.userName
@@ -200,7 +209,10 @@ io.on('connection', (socket) => {
     }
   }
 
-  // leaves a room
+  /**
+   * Remove a user from a specific room.
+   * @param {string} roomCode
+   */
   function leaveRoom (roomCode: string) {
     logWithDate(`@POST /rooms/${roomCode}/leave`)
     const userName = socket.data.user.userName
@@ -233,8 +245,10 @@ io.on('connection', (socket) => {
     }
   }
 
-  // send room messages to user
-  // TODO: just get user's current room, instead of passing in roomId, and get messages for that
+  /**
+   * Get messages from a certain room.
+   * @param {string} roomId
+   */
   function getRoomMessages (roomId: string) {
     logWithDate(`@GET /rooms/${roomId}/messages`)
     // get messages for a room by id
@@ -256,7 +270,11 @@ io.on('connection', (socket) => {
     })
   }
 
-  // send a message to the room
+  /**
+   * Send a message to the room
+   * @param {string} roomId
+   * @param {Array<IMessage>} messages
+   */
   function sendMessageToRoom (roomId:string, messages:Array<IMessage>) {
     logWithDate(`@POST /rooms/${roomId}/messages`)
     const userName = socket.data.user.userName
@@ -306,7 +324,11 @@ io.on('connection', (socket) => {
     }
   }
 
-  // delete a message
+  /**
+   * Delete a specific message by message id.
+   * @param {string} messageId
+   * @param {string} roomId
+   */
   function deleteMessage (messageId: string, roomId: string) {
     logWithDate(`@DELETE /messages`)
     const userName = socket.data.user.userName
