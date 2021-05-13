@@ -1,20 +1,41 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import request from 'supertest'
 import testdb from './test-db'
-import serverApp from '../server'
-import { IMessage } from '../models/message'
-import Room, { IRoom } from '../models/room'
+import { createServer } from 'http'
+import Client from 'socket.io-client'
+import { Server } from 'socket.io'
+import Room from '../models/room'
 
-const agent = request.agent(serverApp)
+let room
+let message
+let io, serverSocket, clientSocket
 
-let room: IRoom
-let message: IMessage
+// TODO: rewrite all tests to use sockets
+// see: https://socket.io/docs/v4/testing/
 
 /**
  * Connect to a new in-memory DB before running tests
  */
-beforeAll(async () => {
+beforeAll(async (done) => {
   await testdb.connect()
+  const httpServer = createServer()
+  io = new Server(httpServer)
+  // middleware to check for userName
+  io.use((socket, next) => {
+    const userName = socket.handshake.auth.userName
+    if (!userName) {
+      return next(new Error('Invalid username'))
+    }
+    socket.userName = userName
+    next()
+  })
+  httpServer.listen(() => {
+    const port = httpServer.address()?.port
+    clientSocket = new Client(`http://localhost:${port}`)
+    io.on('connection', (socket) => {
+      serverSocket = socket
+    })
+    clientSocket.on('connect', done)
+  })
 })
 
 /**
@@ -22,6 +43,8 @@ beforeAll(async () => {
  */
 afterAll(async () => {
   await testdb.close()
+  io.close()
+  clientSocket.close()
 })
 
 /**
@@ -34,23 +57,18 @@ beforeEach(async () => {
   message = await testdb.getMessage()
 })
 
-describe('GET /', () => {
-  it('It should return a welcome message.', (done) => {
-    agent
-      .get('/')
-      .expect(200)
-      .then((res: { text: any }) => {
-        expect(res.text).toBe('Welcome to doodle-mail!')
-        done()
-      })
-  })
-})
-
-
-
 /**
  * Tests
  */
+ describe('GET /', () => {
+  it('It should return a welcome message.', (done) => {
+    clientSocket.on('connection', (res) => {
+      expect(res.text).toBe('Welcome to doodle-mail!')
+      done()
+    })
+  })
+})
+
 describe('GET /rooms/info', () => {
   it('It should return all the available room data.', (done) => {
     agent

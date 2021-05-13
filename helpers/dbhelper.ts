@@ -3,6 +3,7 @@ import Message, { IMessage } from "../models/message"
 import Room, { IRoom } from "../models/room"
 import mongoose, { Query } from 'mongoose'
 import { IMessageData } from "../models/message-data"
+import IUser from '../models/user'
 const ObjectId = mongoose.Types.ObjectId
 
 
@@ -55,30 +56,34 @@ const getRoomInfo = (roomCode: string): Query<IRoom | null, IRoom> => {
 
 /**
  * Create a new chat room.
- * @param {string} userName The id of the user creating the room.
+ * @param {Object} user The user object of the user joining the room.
+ * @param {string} user.userName The name of the user joining the room.
+ * @param {string} user.Id The id of the user joining the room.
  * @param {string} roomCode The 4 digit code used to join the room.
  * @returns {Promise<Object>} Promise object represents the created room info.
  */
-const createRoom = (userName: string, roomCode: string): Promise<IRoom> => {
+const createRoom = (user: IUser, roomCode: string): Promise<IRoom> => {
   return Room.create({
     entryCode: roomCode,
-    participants: [userName],
+    participants: [user],
     messages: []
   })
 }
 
 /**
  * Join a chat room by room code.
- * @param {string} userName The id of the user joining the room.
+ * @param {Object} user The user object of the user joining the room.
+ * @param {string} user.userName The name of the user joining the room.
+ * @param {string} user.Id The id of the user joining the room.
  * @param {string} roomCode The 4 digit room code of the room being joined.
  * @returns {Promise<Object>} Promise object represents the room after joining.
  */
-const joinRoom = (userName: string, roomCode: string): Query<IRoom | null, IRoom> => {
+const joinRoom = (user: IUser, roomCode: string): Query<IRoom | null, IRoom> => {
   return Room.findOneAndUpdate({
     entryCode: roomCode
   }, {
     $push: {
-      participants: userName
+      participants: user
     }
   }, {
     new: true // get result after performing the update
@@ -93,32 +98,25 @@ const joinRoom = (userName: string, roomCode: string): Query<IRoom | null, IRoom
 
 /**
  * Leave chat room by room code.
- * @param {string} userName The id of the user that is leaving the room.
+ * @param {Object} user The user object of the user joining the room.
+ * @param {string} user.userName The name of the user joining the room.
+ * @param {string} user.Id The id of the user joining the room.
  * @param {string} roomCode The 4 digit room code of the room being left.
  * @returns {Promise}
  */
-const leaveRoom = (userName: string, roomCode: string): Promise<void> => {
+const leaveRoom = (user: IUser, roomCode: string): Promise<void> => {
   return new Promise<void>(function (resolve, reject) {
     Room.findOneAndUpdate({
       entryCode: roomCode
     }, {
       // remove user from room by id
       $pull: {
-        participants: userName
+        participants: user
       }
     }, {
       new: true // get result after performing the update.
-    }).then((room: IRoom | null) => {
-      // if room is empty, delete room
-      if (room != null && room.participants.length === 0) {
-        Room.deleteOne({
-          _id: room._id
-        }).then(() => {
-          resolve()
-        })
-      } else {
-        resolve()
-      }
+    }).then(() => {
+      resolve()
     }).catch((err: Error) => {
       console.log(`Error leaving room: ${err}`)
       reject()
@@ -137,7 +135,7 @@ const getRoomMessages = (roomId: string): Query<IRoom | null, IRoom> => {
       path: 'messages',
       select: '-room',
       options: {
-        sort: { 'date': -1 }
+        sort: { date: 'desc' }
       }
     })
 }
@@ -148,14 +146,16 @@ const getRoomMessages = (roomId: string): Query<IRoom | null, IRoom> => {
  * @param {string} message.title The title of the message.
  * @param {string} message.imageData The image data, saved to a base64 string.
  * @param {string} message.background The background color of the image, as hex code or name.
- * @param {string} userName The id of the user sending the message.
+ * @param {Object} user The user object of the user joining the room.
+ * @param {string} user.userName The name of the user joining the room.
+ * @param {string} user.Id The id of the user joining the room.
  * @param {string} roomId The id of the room to send the message to.
  * @returns {Promise<Object>} Promise object represents the room state after message is sent.
  */
-const sendMessageToRoom = (message: IMessageData, userName: string, roomId: string): Promise<IRoom | null> => {
+const sendMessageToRoom = (message: IMessageData, user: IUser, roomId: string): Promise<IRoom | null> => {
   return new Promise(function (resolve, reject) {
     Message.create({
-      author: userName,
+      author: user,
       room: new ObjectId(roomId),
       title: message.title,
       date: new Date(),
@@ -173,7 +173,7 @@ const sendMessageToRoom = (message: IMessageData, userName: string, roomId: stri
           path: 'messages',
           select: '-room',
           options: {
-            sort: { 'date': -1 }
+            sort: { date: 'desc' }
           }
         }).then((room: IRoom | null) => {
           resolve(room)
@@ -183,6 +183,15 @@ const sendMessageToRoom = (message: IMessageData, userName: string, roomId: stri
         reject()
       })
   })
+}
+
+/**
+ * Returns info for a single message by id.
+ * @param messageId The id of the message to find
+ * @returns {Promise<Object>}
+ */
+const getMessageById = (messageId: string): Query<IMessage | null, IMessage> => {
+  return Message.findById(messageId)
 }
 
 /**
@@ -225,6 +234,7 @@ export default {
   leaveRoom,
   getRoomMessages,
   sendMessageToRoom,
+  getMessageById,
   deleteMessageById,
   generateUniqueRoomCode
 }

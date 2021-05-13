@@ -1,13 +1,13 @@
-import { IRoom } from "./models/room"
 import dotenv from 'dotenv'
 import express from 'express'
+import http from 'http'
+import { Server } from 'socket.io'
 import path from 'path'
 import bodyParser from 'body-parser'
 import cors from 'cors'
-import swaggerUi from 'swagger-ui-express'
-import YAML from 'yamljs'
 import dbhelper from './helpers/dbhelper'
 import logWithDate from './helpers/loghelper'
+import { IRoom } from "./models/room"
 import { IMessageData } from "./models/message-data"
 import { IMessage } from "./models/message"
 
@@ -32,292 +32,333 @@ const corsOptions: cors.CorsOptions = {
   credentials: true,
   exposedHeaders: ['origin', 'X-requested-with', 'Content-Type', 'Accept']
 }
-
 app.use(cors(corsOptions))
 
-const swaggerSpec = YAML.load('./swagger.yaml')
+// create server and websocket
+const server = http.createServer(app)
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins
+  }
+})
 
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+// check for existing userName on connection
+io.use((socket, next) => {
+  // set socket user data from authentication layer
+  const userName = socket.handshake.auth.userName
+  if (!userName) {
+    return next(new Error('invalid username'))
+  }
+  socket.data.user = {
+    userName: userName,
+    id: socket.id
+  }
+  next()
+})
 
-// connect to mongo and start web server if not a test
+// start server
+const port = process.env.PORT || 5000
+server.listen(port, () => {
+  console.log('server started on port: ' + port)
+})
+
+// connect to mongo if not a test
 if (process.env.NODE_ENV !== 'test') {
   // connect to Mongo DB instance
   const connectionString: string = process.env.MONGO_URL || ''
   dbhelper.createConnection(connectionString)
-
-  // start server
-  const port = process.env.PORT || 5000
-  app.listen(port)
-  console.log('server started on port: ' + port)
 }
 
-/**
- * API Routes
- */
+// Web Socket listener
+io.on('connection', (socket) => {
+  // friendly welcome :)
+  console.log('User joined.')
+  socket.emit('welcome', 'Welcome to doodle mail! :)')
 
-/**
- * Retrieve a simple test message from the server.
- */
-app.get('/', function (req: express.Request, res: express.Response) {
-  res.header('Access-Control-Allow-Methods', 'GET')
-  logWithDate(`@GET /`)
-  return res.status(200).send('Welcome to doodle-mail!')
-})
+  // socket event listeners
+  socket.on('rooms:info', (roomCode) => getRoomInfo(roomCode))
+  socket.on('rooms:create', async () => await createRoom())
+  socket.on('rooms:join', (roomCode) => joinRoom(roomCode))
+  socket.on('rooms:leave', (roomCode) => leaveRoom(roomCode))
+  socket.on('rooms:messages', (roomId) => getRoomMessages(roomId))
+  socket.on('rooms:messages:send', (roomId, messages) => sendMessageToRoom(roomId, messages) )
+  socket.on('rooms:messages:delete', (messageId, roomId) => deleteMessage(messageId, roomId))
 
-/**
- * View basic info for all rooms, not including message or user details. Only accessible in dev environment.
- */
-app.get('/rooms/info', function (req: express.Request, res: express.Response) {
-  res.header('Access-Control-Allow-Methods', 'GET')
-  logWithDate(`@GET /rooms/info`)
-  if (process.env.NODE_ENV !== 'production') {
-    dbhelper.getAllRoomInfo().then((rooms: Array<IRoom>) => {
-      return res.status(200).send({
-        rooms: rooms
-      })
-    })
-  } else {
-    logWithDate(`Endpoint not allowed in production environment`)
-    return res.status(200).send('Nice try :)')
-  }
-})
+  // TODO: may be able to factor out joining + leaving rooms as sockets make it irrelevant
 
-/**
- * View info for a specific room, including user names and message details.
- */
-app.get('/rooms/:roomCode/info', function (req: express.Request, res: express.Response) {
-  res.header('Access-Control-Allow-Methods', 'GET')
-  res.header('Content-Type', 'application/json')
-  logWithDate(`@GET /rooms/${req.params.roomCode}/info`)
-  if (req.params.roomCode != null) {
-    logWithDate(`Finding room: ${req.params.roomCode}`)
-    dbhelper.getRoomInfo(req.params.roomCode).then((room: IRoom | null) => {
-      return res.status(200).send({
-        room: room
-      })
-    }).catch((err: Error) => {
-      logWithDate(`Error finding room ${req.params.roomCode}: ${err}`, true)
-      return res.status(400).send({
-        message: `Failed to get room info`
-      })
-    })
-  } else {
-    logWithDate(`Missing room code in URL`)
-    return res.status(400).send()
-  }
-})
-
-/**
- * Create a new room and add the specified user to it, then return the room details.
- */
-app.post('/rooms', async function (req: express.Request, res: express.Response) {
-  res.header('Access-Control-Allow-Methods', 'POST')
-  res.header('Content-Type', 'application/json')
-  logWithDate(`@POST /rooms`)
-  if (req.body.userName != null) {
-    // generate room code
-    logWithDate(`Generating unique 4 digit room code`)
-    const roomCode: string = await dbhelper.generateUniqueRoomCode()
-    logWithDate(`Creating room for user: ${req.body.userName} with code: ${roomCode}`)
-    // create room in db
-    dbhelper.createRoom(req.body.userName, roomCode).then((room: IRoom) => {
-      return res.status(200).send({
-        room: room
-      })
-    }).catch((err: Error) => {
-      logWithDate(`Failed to create room for user ${req.body.userName}: ${err}`, true)
-      return res.status(400).send({
-        message: `Failed to create new room`
-      })
-    })
-  } else {
-    // throw error if data is incomplete.
-    logWithDate(`Missing userName in request body`)
-    return res.status(400).send()
-  }
-})
-
-/**
- * Add user to a room selected by room code, then return the room.
- */
-app.post('/rooms/:roomCode/join', function (req: express.Request, res: express.Response) {
-  res.header('Access-Control-Allow-Methods', 'POST')
-  res.header('Content-Type', 'application/json')
-  logWithDate(`@POST /rooms/${req.params.roomCode}/join`)
-  // join an existing room using a code
-  if (req.params.roomCode != null && req.body.userName != null) {
-    logWithDate(`User ${req.body.userName} attempting to join room with code ${req.params.roomCode}`)
-    dbhelper.getRoomInfo(req.params.roomCode).then((room) => {
-      if (room == null) {
-        logWithDate(`Failed to add user ${req.body.userName} to room ${req.params.roomCode}: room is null`)
-        return res.status(400).send({
-          message: `Room does not exist.`
-        })
-      }
-      // check name against existing room occupants
-      if (room.participants.includes(req.body.userName)) {
-        logWithDate(`User ${req.body.userName} already exists in room ${req.params.roomCode}`)
-        return res.status(400).send({
-          message: `Someone with same name is already in room.`
-        })
-      }
-      // find room by roomCode, add user to it, and populate the array of users in room
-      dbhelper.joinRoom(req.body.userName, req.params.roomCode).then((room: IRoom | null) => {
-        logWithDate(`Joined room successfully.`)
-        // return data for room
-        return res.status(200).send({
+  // TODO: better code comments here
+  // returns room info for specific room
+  function getRoomInfo (roomCode: string) {
+    logWithDate(`@GET /rooms/${roomCode}/info`)
+    if (roomCode != null) {
+      logWithDate(`Finding room: ${roomCode}`)
+      dbhelper.getRoomInfo(roomCode).then((room: IRoom | null) => {
+        socket.emit('room:info', {
           room: room
         })
       }).catch((err: Error) => {
-        logWithDate(`Failed to add user ${req.body.userName} to room ${req.params.roomCode}: ${err}`, true)
-        return res.status(400).send({
-          message: `Failed to add user to room.`
+        logWithDate(`Error finding room ${roomCode}: ${err}`, true)
+        socket.emit('error', {
+          message: `Failed to get room info`
         })
       })
-    }).catch((err: Error) => {
-      logWithDate(`Failed to add user ${req.body.userName} to room ${req.params.roomCode}: ${err}`, true)
-      return res.status(400).send({
-        message: `Failed to add user to room.`
+    } else {
+      logWithDate(`Missing room code in request`)
+      socket.emit('error', {
+        message: `Missing room code in request`
       })
-    })
-
-  } else {
-    logWithDate(`Missing roomCode in URL params or userName in request body`)
-    // throw error if data is incomplete.
-    return res.status(400).send()
-  }
-})
-
-/**
- * Remove user from room selected by room code.
- */
-app.post('/rooms/:roomCode/leave', function (req: express.Request, res: express.Response) {
-  res.header('Access-Control-Allow-Methods', 'POST')
-  res.header('Content-Type', 'application/json')
-  logWithDate(`@POST /rooms/${req.params.roomCode}/leave`)
-  // join an existing room using a code
-  if (req.params.roomCode != null && req.body.userName != null) {
-    logWithDate(`User ${req.body.userName} attempting to leave room with code ${req.params.roomCode}`)
-    // find room by code and leave it
-    dbhelper.leaveRoom(req.body.userName, req.params.roomCode).then(() => {
-      return res.sendStatus(200)
-    }).catch((err: Error) => {
-      logWithDate(`Failed to remove user ${req.body.userName} from room ${req.params.roomCode}: ${err}`, true)
-      return res.status(400).send({
-        message: `Failed to remove user from room`
-      })
-    })
-  } else {
-    logWithDate(`Missing roomCode in URL parameters or userName in request body`)
-    // throw error if data is incomplete
-    return res.status(400).send()
-  }
-})
-
-/**
- * Gets all messages for the room by roomId, including all message and author details.
- */
-app.get('/rooms/:roomId/messages', function (req: express.Request, res: express.Response) {
-  res.header('Access-Control-Allow-Methods', 'GET')
-  res.header('Content-Type', 'application/json')
-  logWithDate(`@GET /rooms/${req.params.roomId}/messages`)
-  // get messages for a room by id
-  dbhelper.getRoomMessages(req.params.roomId).then((room: IRoom | null) => {
-    if (room != null) {
-      logWithDate(`Getting messages for room ${req.params.roomId}`)
-      return res.status(200).send(room.messages)
     }
-    return res.status(400).send({
-      message: `Room ${req.params.roomId} does not exist`
-    })
-  }).catch((err: Error) => {
-    logWithDate(`Unable to retrieve messages for room ${req.params.roomId}: ${err}`, true)
-    return res.status(400).send({
-      message: `Unable to retrieve room messages`
-    })
-  })
-})
-
-/**
- * Write a message to a room by room id.
- * Returns list of room messages.
- * Requires fields: user, message: { title, imageData, background }
- */
-app.post('/rooms/:roomId/messages', function (req: express.Request, res: express.Response) {
-  res.header('Access-Control-Allow-Methods', 'POST')
-  res.header('Content-Type', 'application/json')
-  logWithDate(`@POST /rooms/${req.params.roomId}/messages`)
-  let result: IRoom | null = null
-  if (req.params.roomId != null && req.body.userName != null && req.body.messages != null) {
-    logWithDate(`Sending message from user ${req.body.userName} to room ${req.params.roomId}`)
-    // create message, then add it to a room
-    const messageWrites = req.body.messages.map((message: IMessageData) => {
-      return new Promise<void>((resolve, reject) => {
-        // insert each message into DB collection
-        dbhelper.sendMessageToRoom(message, req.body.userName, req.params.roomId)
-          .then((room: IRoom | null) => {
-            result = room
-            resolve()
-          })
-          .catch((err: Error) => {
-            logWithDate(`Error writing message from user ${req.body.userName} to room ${req.params.roomId}: ${err}`, true)
-            reject()
-          })
-      })
-    })
-    Promise.all(messageWrites).then(() => {
-      logWithDate(`Wrote all messages successfully.`)
-      if (result != null) {
-        return res.status(200).send(result.messages)
-      }
-      else {
-        logWithDate(`Error writing messages to room.`)
-        return res.status(400).send({
-          message: `Failed to write messages to room.`
-        })
-      }
-    }).catch((err: Error) => {
-      logWithDate(`Failed to send messages from user ${req.body.userName} to room ${req.params.roomId}: ${err}`, true)
-      return res.status(400).send({
-        message: `Failed to send message to room`
-      })
-    })
-  } else {
-    logWithDate(`Missing roomId in URL params or userName, messages objects in request body`)
-    return res.status(400).send()
   }
-})
 
-/**
- * Delete message by messageId
- */
-app.delete('/rooms/:roomId/messages', function (req: express.Request, res: express.Response) {
-  res.header('Access-Control-Allow-Methods', 'DELETE')
-  res.header('Content-Type', 'application/json')
-  logWithDate(`@DELETE /messages`)
-  if (req.body.messageId != null) {
-    logWithDate(`Deleting message with id ${req.body.messageId} from room ${req.params.roomId}`)
-    dbhelper.deleteMessageById(req.body.messageId).then(() => {
-        dbhelper.getRoomMessages(req.params.roomId).then((room: IRoom | null) => {
-          logWithDate(`Message deleted successfully`)
-          const messages: IMessage[] = (room != null) ? room.messages : []
-          return res.status(200).send(messages)
+  // creates a new room and returns room info
+  async function createRoom () {
+    logWithDate(`@POST /rooms`)
+    const userName = socket.data.user.userName
+    if (userName != null) {
+      // generate room code
+      logWithDate(`Generating unique 4 digit room code`)
+      const roomCode: string = await dbhelper.generateUniqueRoomCode()
+      logWithDate(`Creating room for user: ${userName} with code: ${roomCode}`)
+      // create room in db
+      dbhelper.createRoom(socket.data.user, roomCode).then((room: IRoom) => {
+        // join that room
+        socket.join(roomCode)
+        // send back the new room data
+        socket.emit('room:create', {
+          room: room
+        })
+        io.to(roomCode).emit('user:joined', {
+          message: `User ${userName} joined the room.`
+        })
+      }).catch((err: Error) => {
+        logWithDate(`Failed to create room for user ${userName}: ${err}`, true)
+        socket.emit('error', {
+          message: `Failed to create new room`
+        })
+      })
+    } else {
+      // throw error if data is incomplete.
+      logWithDate(`Missing userName in request body`)
+      socket.emit('error', {
+        message: `Missing userName in request body`
+      })
+    }
+  }
+
+  // joins an existing room
+  function joinRoom (roomCode: string) {
+    logWithDate(`@POST /rooms/${roomCode}/join`)
+    const userName = socket.data.user.userName
+    // join an existing room using a code
+    if (roomCode != null && userName != null) {
+      logWithDate(`User ${userName} attempting to join room with code ${roomCode}`)
+      dbhelper.getRoomInfo(roomCode).then((room) => {
+        if (room == null) {
+          logWithDate(`Failed to add user ${userName} to room ${roomCode}: room is null`)
+          socket.emit('error', {
+            message: `Room does not exist.`
+          })
+          return
+        }
+        // check name against existing room occupants
+        if ((room?.participants.filter((x) => x.userName === userName).length ?? 0) > 0) {
+          logWithDate(`User ${userName} already exists in room ${roomCode}`)
+          socket.emit('error', {
+            message: `Someone with same name is already in room.`
+          })
+        }
+        // find room by roomCode, add user to it, and populate the array of users in room
+        dbhelper.joinRoom(socket.data.user, roomCode).then((room: IRoom | null) => {
+          logWithDate(`Joined room successfully.`)
+          // listen for broadcasts to that specific roomCode
+          socket.join(roomCode)
+          // return data for room
+          socket.emit('room:join', {
+            room: room
+          })
+          io.to(roomCode).emit('user:joined', {
+            message: `User ${userName} joined the room.`
+          })
         }).catch((err: Error) => {
-          logWithDate(`Failed to retrieve messages for room ${req.params.roomId}: ${err}`, true)
-          return res.status(400).send({
-            message: `Failed to get room messages.`
+          logWithDate(`Failed to add user ${userName} to room ${roomCode}: ${err}`, true)
+          socket.emit('error', {
+            message: `Failed to add user to room.`
           })
         })
       }).catch((err: Error) => {
-        logWithDate(`Failed to delete message with id ${req.body.messageId}: ${err}`, true)
-        return res.status(400).send({
-          message: `Failed to delete message`
+        logWithDate(`Failed to add user ${userName} to room ${roomCode}: ${err}`, true)
+        socket.emit('error', {
+          message: `Failed to add user to room.`
         })
       })
-  } else {
-    logWithDate(`Missing messageId in request body`)
-    return res.status(400).send()
+    } else {
+      logWithDate(`Missing roomCode in URL params or userName in request body`)
+      // throw error if data is incomplete.
+      socket.emit('error', {
+        message: `Missing roomCode in URL params or userName in request body`
+      })
+    }
   }
+
+  // leaves a room
+  function leaveRoom (roomCode: string) {
+    logWithDate(`@POST /rooms/${roomCode}/leave`)
+    const userName = socket.data.user.userName
+    // join an existing room using a code
+    if (roomCode != null && userName != null) {
+      logWithDate(`User ${userName} attempting to leave room with code ${roomCode}`)
+      // find room by code and leave it
+      dbhelper.leaveRoom(socket.data.user, roomCode).then(() => {
+        logWithDate(`User ${userName} left room ${roomCode} successfully.`)
+        socket.leave(roomCode)
+        socket.data.room.code = null
+        socket.emit('room:leave', {
+          message: 'ok'
+        })
+        io.to(roomCode).emit('user:left', {
+          message: `User ${userName} left the room.`
+        })
+      }).catch((err: Error) => {
+        logWithDate(`Failed to remove user ${userName} from room ${roomCode}: ${err}`, true)
+        socket.emit('error', {
+          message: `Failed to remove user from room`
+        })
+      })
+    } else {
+      logWithDate(`Missing roomCode in URL parameters or userName in request body`)
+      // throw error if data is incomplete
+      socket.emit('error', {
+        message: `Missing roomCode in URL parameters or userName in request body`
+      })
+    }
+  }
+
+  // send room messages to user
+  // TODO: just get user's current room, instead of passing in roomId, and get messages for that
+  function getRoomMessages (roomId: string) {
+    logWithDate(`@GET /rooms/${roomId}/messages`)
+    // get messages for a room by id
+    dbhelper.getRoomMessages(roomId).then((room: IRoom | null) => {
+      if (room != null) {
+        logWithDate(`Getting messages for room ${roomId}`)
+        socket.emit('messages', {
+          messages: room.messages
+        })
+      }
+      socket.emit('error', {
+        message: `Room ${roomId} does not exist`
+      })
+    }).catch((err: Error) => {
+      logWithDate(`Unable to retrieve messages for room ${roomId}: ${err}`, true)
+      socket.emit('error', {
+        message: `Unable to retrieve room messages`
+      })
+    })
+  }
+
+  // send a message to the room
+  function sendMessageToRoom (roomId:string, messages:Array<IMessage>) {
+    logWithDate(`@POST /rooms/${roomId}/messages`)
+    const userName = socket.data.user.userName
+    let result: IRoom | null = null
+    if (roomId != null && userName != null && messages != null) {
+      logWithDate(`Sending message from user ${userName} to room ${roomId}`)
+      // create message, then add it to a room
+      const messageWrites = messages.map((message: IMessageData) => {
+        return new Promise<void>((resolve, reject) => {
+          // insert each message into DB collection
+          dbhelper.sendMessageToRoom(message, socket.data.user, roomId)
+            .then((room: IRoom | null) => {
+              result = room
+              resolve()
+            })
+            .catch((err: Error) => {
+              logWithDate(`Error writing message from user ${userName} to room ${roomId}: ${err}`, true)
+              reject()
+            })
+        })
+      })
+      Promise.all(messageWrites).then(() => {
+        logWithDate(`Wrote all messages successfully.`)
+        if (result != null) {
+          io.to(result.entryCode).emit('messages', {
+            messages: result.messages
+          })
+        }
+        else {
+          logWithDate(`Error writing messages to room.`)
+          socket.emit('error', {
+            status: 'error',
+            message: `Failed to write messages to room.`
+          })
+        }
+      }).catch((err: Error) => {
+        logWithDate(`Failed to send messages from user ${userName} to room ${roomId}: ${err}`, true)
+        socket.emit('error', {
+          message: `Failed to send message to room`
+        })
+      })
+    } else {
+      logWithDate(`Missing roomId in URL params or userName, messages objects in request body`)
+      socket.emit('error', {
+        message: `Missing roomId in URL params or userName, messages objects in request body`
+      })
+    }
+  }
+
+  // delete a message
+  function deleteMessage (messageId: string, roomId: string) {
+    logWithDate(`@DELETE /messages`)
+    const userName = socket.data.user.userName
+    if (messageId != null) {
+      logWithDate(`Deleting message with id ${messageId} from room ${roomId}`)
+      dbhelper.getMessageById(messageId).then((message) => {
+        if (message?.author?.userName !== userName) {
+          socket.emit('error', {
+            message: 'Only the author is allowed to delete this message.'
+          })
+          return
+        }
+        dbhelper.deleteMessageById(messageId).then(() => {
+          dbhelper.getRoomMessages(roomId).then((room: IRoom | null) => {
+            if (room != null) {
+              logWithDate(`Message deleted successfully`)
+              const messages: IMessage[] = (room != null) ? room.messages : []
+              io.to(room.entryCode).emit('messages', {
+                messages: messages
+              })
+            } else {
+              logWithDate(`Failed to delete message. Room does not exist.`)
+              socket.emit('error', {
+                message: 'Room does not exist.'
+              })
+            }
+          }).catch((err: Error) => {
+            logWithDate(`Failed to retrieve messages for room ${roomId}: ${err}`, true)
+            socket.emit('error', {
+              message: `Failed to get room messages.`
+            })
+          })
+        }).catch((err: Error) => {
+          logWithDate(`Failed to delete message with id ${messageId}: ${err}`, true)
+          socket.emit('error', {
+            message: `Failed to delete message`
+          })
+        })
+      })
+    } else {
+      logWithDate(`Missing messageId in request body`)
+      socket.emit('error', {
+        message: `Missing messageId in request body`
+      })
+    }
+  }
+
+  socket.on('disconnect', () => {
+    console.log(`User ${socket.data.user.userName} disconnected.`)
+  })
 })
+
+
 
 export default app
