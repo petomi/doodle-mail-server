@@ -135,7 +135,7 @@ const getRoomMessages = (roomId: string): Query<IRoom | null, IRoom> => {
       path: 'messages',
       select: '-room',
       options: {
-        sort: { 'date': -1 }
+        sort: { date: 'desc' }
       }
     })
 }
@@ -173,7 +173,7 @@ const sendMessageToRoom = (message: IMessageData, user: IUser, roomId: string): 
           path: 'messages',
           select: '-room',
           options: {
-            sort: { 'date': -1 }
+            sort: { date: 'desc' }
           }
         }).then((room: IRoom | null) => {
           resolve(room)
