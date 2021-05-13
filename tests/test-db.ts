@@ -48,11 +48,11 @@ const seed = () => {
   return new Promise<void>(function (resolve) {
     Room.create({
       entryCode: 'ABCD',
-      participants: ['pleb', 'bob'],
+      participants: [{userName:'pleb', id: '45'}, {userName:'bob', id: '6'}],
       messages: []
     }).then((room: IRoom) => {
       Message.create([{
-        author: 'pleb',
+        author: {userName: 'pleb', id: '45'},
         room: new ObjectId(room._id),
         title: 'Test Message 1',
         date: new Date(),
@@ -60,7 +60,7 @@ const seed = () => {
         background: 'white'
       },
       {
-        author: 'bob',
+        author: {userName:'bob', id: '6'},
         room: new ObjectId(room._id),
         title: 'Test Message 2',
         date: new Date(),
