@@ -1,13 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import bcrypt from 'bcrypt'
 import testdb from './test-db'
 import dbhelper from '../helpers/dbhelper'
 import { IMessage } from '../models/message'
-import Room, { IRoom } from '../models/room'
+import { IRoom } from '../models/room'
 import IUser from '../models/user'
 
-let allUsers: Array<IUser>
-let user: IUser
 let testRoom: IRoom
 let testMessage: IMessage
 let testUser: IUser
@@ -74,15 +70,6 @@ describe('createRoom', () => {
       done()
     })
   })
-  // it(`Returns an error if the userId is not specified.`, done => {
-  //   agent
-  //     .post('/rooms')
-  //     .send({})
-  //     .expect(400)
-  //     .then(() => {
-  //       done()
-  //     })
-  // })
 })
 
 describe('joinRoom', () => {
@@ -93,15 +80,6 @@ describe('joinRoom', () => {
       done()
     })
   })
-  // it(`Returns an error if the userId is not specified.`, done => {
-  //   agent
-  //     .post('/rooms/ABCD/join')
-  //     .send({})
-  //     .expect(400)
-  //     .then(() => {
-  //       done()
-  //     })
-  // })
 })
 
 describe('leaveRoom', () => {
@@ -113,15 +91,6 @@ describe('leaveRoom', () => {
       })
     })
   })
-  // it(`Returns an error if the userId is not specified.`, done => {
-  //   agent
-  //     .post('/rooms/ABCD/leave')
-  //     .send({})
-  //     .expect(400)
-  //     .then(() => {
-  //       done()
-  //     })
-  // })
 })
 
 describe('getRoomMessages', () => {
@@ -131,24 +100,6 @@ describe('getRoomMessages', () => {
       done()
     })
   })
-  // it(`Returns an error if the userId is not authorized.`, async (done) => {
-  //   agent
-  //     .get(`/rooms/${room._id}/messages`)
-  //     .send({})
-  //     .expect(401)
-  //     .then(() => {
-  //       done()
-  //     })
-  // })
-  // it(`Returns an error if the userId is not specified.`, async (done) => {
-  //   agent
-  //     .get(`/rooms/${room._id}/messages`)
-  //     .send({})
-  //     .expect(401)
-  //     .then(() => {
-  //       done()
-  //     })
-  // })
 })
 
 describe('sendMessageToRoom', () => {
@@ -158,61 +109,6 @@ describe('sendMessageToRoom', () => {
       done()
     })
   })
-  // it('Adds multiple messages to the indicated room.', async (done) => {
-  //   agent
-  //     .post(`/rooms/${room._id}/messages`)
-  //     .send({
-  //       messages: [{
-  //         title: 'Test Message 5',
-  //         imageData: 'TALKJLASJD',
-  //         background: 'blue'
-  //       },
-  //       {
-  //         "title": 'Test Message 6',
-  //         "imageData": 'TALKJLASJD',
-  //         "background": 'white'
-  //       }
-  //       ],
-  //       userId: user._id
-  //     })
-  //     .expect(200)
-  //     .then((res: { body: string | any[] }) => {
-  //       expect(res.body.length).toBe(4)
-  //       done()
-  //     })
-  // })
-  // it(`Returns an error if the userId is not specified.`, async (done) => {
-  //   agent
-  //     .post(`/rooms/${room._id}/messages`)
-  //     .send({
-  //       messages: [{
-  //         title: 'Test Message 5',
-  //         imageData: 'TALKJLASJD',
-  //         background: 'blue'
-  //       },
-  //       {
-  //         "title": 'Test Message 6',
-  //         "imageData": 'TALKJLASJD',
-  //         "background": 'white'
-  //       }
-  //       ],
-  //     })
-  //     .expect(400)
-  //     .then(() => {
-  //       done()
-  //     })
-  // })
-  // it('Returns an error if messages are not specified.', async (done) => {
-  //   agent
-  //     .post(`/rooms/${room._id}/messages`)
-  //     .send({
-  //       userId: user._id
-  //     })
-  //     .expect(400)
-  //     .then(() => {
-  //       done()
-  //     })
-  // })
 })
 
 describe('DELETE /messages', () => {
@@ -221,14 +117,5 @@ describe('DELETE /messages', () => {
       done()
     })
   })
-  // it(`Returns an error if the userId is not specified.`, done => {
-  //   agent
-  //     .delete('/messages')
-  //     .send({})
-  //     .expect(400)
-  //     .then(() => {
-  //       done()
-  //     })
-  // })
 })
 
