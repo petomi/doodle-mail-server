@@ -6,7 +6,7 @@ export interface IMessage extends Document {
   author: IUser,
   room: IRoom['_id'],
   title: string,
-  date: string,
+  date: Date,
   imageData: string,
   background: string
 }
@@ -26,7 +26,7 @@ const MessageSchema: Schema = new Schema({
     required: true
   },
   date: {
-    type: String,
+    type: Date,
     required: true
   },
   imageData: {

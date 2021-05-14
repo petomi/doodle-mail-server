@@ -86,7 +86,6 @@ io.on('connection', (socket) => {
 
   // TODO: may be able to factor out joining + leaving rooms as sockets make it irrelevant
   // TODO: refactor these methods further into logic modules and add server.spec.ts with unit tests for them
-  // TODO: better code comments here
 
   /**
    * Returns room info for specific room
