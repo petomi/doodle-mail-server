@@ -84,9 +84,6 @@ io.on('connection', (socket) => {
   socket.on('rooms:messages:send', (roomId, messages) => sendMessageToRoom(roomId, messages) )
   socket.on('rooms:messages:delete', (messageId, roomId) => deleteMessage(messageId, roomId))
 
-  // TODO: may be able to factor out joining + leaving rooms as sockets make it irrelevant
-  // TODO: refactor these methods further into logic modules and add server.spec.ts with unit tests for them
-
   /**
    * Returns room info for specific room
    * @param {string} roomCode
